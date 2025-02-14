@@ -19,21 +19,32 @@ interface Employee {
 const EmployeeTable: React.FC<{ employees: Employee[] }> = ({ employees }) => {
   const [filters, setFilters] = useState<{ [key: string]: string }>({});
   const [showDatePicker, setShowDatePicker] = useState(false);
+  const [currentPage, setCurrentPage] = useState(1);
+  const employeesPerPage = 5; // Change this to adjust page size
 
   // Extract unique department & role values for dropdowns
-  const departments = [...new Set(employees.map(emp => emp.department))];
-  const roles = [...new Set(employees.map(emp => emp.role))];
+  const departments = [...new Set(employees.map((emp) => emp.department))];
+  const roles = [...new Set(employees.map((emp) => emp.role))];
 
   // Handle input change for search filters
   const handleFilterChange = (column: string, value: string) => {
     setFilters((prev) => ({ ...prev, [column]: value.toLowerCase() }));
   };
 
-  // Filtered employees based on search input
+  // Filter employees based on search input
   const filteredEmployees = employees.filter((employee) =>
     Object.keys(filters).every((key) =>
-      !filters[key] ? true : employee[key as keyof Employee]?.toString().toLowerCase().includes(filters[key])
+      !filters[key]
+        ? true
+        : employee[key as keyof Employee]?.toString().toLowerCase().includes(filters[key])
     )
+  );
+
+  // Pagination logic
+  const totalPages = Math.ceil(filteredEmployees.length / employeesPerPage);
+  const paginatedEmployees = filteredEmployees.slice(
+    (currentPage - 1) * employeesPerPage,
+    currentPage * employeesPerPage
   );
 
   return (
@@ -66,7 +77,6 @@ const EmployeeTable: React.FC<{ employees: Employee[] }> = ({ employees }) => {
                 "Actions",
               ].map((header, index) => (
                 <th key={index} className="p-2">
-                  {/* Search bars for all except specified headers */}
                   {!["Photo", "Department", "Role", "Hire Date", "Actions"].includes(header) && (
                     <div className="flex items-center">
                       <input
@@ -79,7 +89,6 @@ const EmployeeTable: React.FC<{ employees: Employee[] }> = ({ employees }) => {
                     </div>
                   )}
 
-                  {/* Dropdown for Department */}
                   {header === "Department" && (
                     <select
                       onChange={(e) => handleFilterChange("department", e.target.value)}
@@ -92,7 +101,6 @@ const EmployeeTable: React.FC<{ employees: Employee[] }> = ({ employees }) => {
                     </select>
                   )}
 
-                  {/* Dropdown for Role */}
                   {header === "Role" && (
                     <select
                       onChange={(e) => handleFilterChange("role", e.target.value)}
@@ -105,7 +113,6 @@ const EmployeeTable: React.FC<{ employees: Employee[] }> = ({ employees }) => {
                     </select>
                   )}
 
-                  {/* Date Picker for Hire Date */}
                   {header === "Hire Date" && (
                     <div className="relative">
                       <input
@@ -113,7 +120,7 @@ const EmployeeTable: React.FC<{ employees: Employee[] }> = ({ employees }) => {
                         className="w-full p-2 bg-white border border-gray-300 rounded focus:outline-none"
                         onChange={(e) => handleFilterChange("hireDate", e.target.value)}
                       />
-                      {/* <FaChevronDown className="absolute right-2 top-3 text-gray-500 pointer-events-none" /> */}
+                      <FaChevronDown className="absolute right-2 top-3 text-gray-500 pointer-events-none" />
                     </div>
                   )}
                 </th>
@@ -123,10 +130,9 @@ const EmployeeTable: React.FC<{ employees: Employee[] }> = ({ employees }) => {
 
           {/* Table Body */}
           <tbody>
-            {filteredEmployees.length > 0 ? (
-              filteredEmployees.map((employee, index) => (
+            {paginatedEmployees.length > 0 ? (
+              paginatedEmployees.map((employee, index) => (
                 <tr key={employee.id} className={`border-b ${index % 2 === 0 ? "bg-gray-100" : "bg-white"} hover:bg-gray-200`}>
-                  {/* Employee Photo */}
                   <td className="p-3">
                     <img
                       src={employee.photograph || "/default-profile.png"}
@@ -135,7 +141,6 @@ const EmployeeTable: React.FC<{ employees: Employee[] }> = ({ employees }) => {
                     />
                   </td>
 
-                  {/* Employee Info */}
                   <td className="p-3 font-semibold text-gray-900 whitespace-nowrap">{employee.firstName} {employee.lastName}</td>
                   {["username", "phoneNumber", "jobTitle", "department", "role", "salary", "hireDate"].map((field) => (
                     <td key={field} className="p-3 text-gray-600 truncate max-w-[150px]" title={employee[field as keyof Employee]?.toString()}>
@@ -143,7 +148,6 @@ const EmployeeTable: React.FC<{ employees: Employee[] }> = ({ employees }) => {
                     </td>
                   ))}
 
-                  {/* Actions */}
                   <td className="p-3 text-center">
                     <button className="text-blue-600 hover:text-blue-800 mx-1"><FaEye size={18} /></button>
                     <button className="text-green-600 hover:text-green-800 mx-1"><FaUserEdit size={18} /></button>
@@ -158,6 +162,29 @@ const EmployeeTable: React.FC<{ employees: Employee[] }> = ({ employees }) => {
             )}
           </tbody>
         </table>
+      </div>
+
+      {/* Pagination Controls */}
+      <div className="flex justify-between items-center mt-4">
+        <button
+          className="px-4 py-2 bg-blue-600 text-white rounded disabled:opacity-50"
+          disabled={currentPage === 1}
+          onClick={() => setCurrentPage((prev) => Math.max(prev - 1, 1))}
+        >
+          Previous
+        </button>
+
+        <span className="text-gray-700">
+          Page {currentPage} of {totalPages}
+        </span>
+
+        <button
+          className="px-4 py-2 bg-blue-600 text-white rounded disabled:opacity-50"
+          disabled={currentPage === totalPages}
+          onClick={() => setCurrentPage((prev) => Math.min(prev + 1, totalPages))}
+        >
+          Next
+        </button>
       </div>
     </div>
   );

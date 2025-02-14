@@ -12,3 +12,63 @@ datasource db {
   provider = "postgresql"
   url      = env("DATABASE_URL")
 }
+
+model User {
+  id                      Int      @id @default(autoincrement())
+  firstName               String   // First name of the user
+  lastName                String   // Last name of the user
+  username                String   @unique // Unique username for login
+  password                String   // Hashed password for security
+  phoneNumber             String?  // Optional phone number
+  dateOfBirth             DateTime? // Date of birth
+  gender                  String?  // Gender (e.g., Male, Female, Other)
+  maritalStatus           String?  // Marital status (e.g., Single, Married)
+  emergencyContactName    String?  // Name of emergency contact
+  emergencyContactPhone   String?  // Phone number of emergency contact
+  address                 String?  // Address of the user
+  hireDate                DateTime? // Date the user was hired
+  jobTitle                String?  // Job title of the user
+  role                    Role      @default(Employee)
+  positionLevel           String?  // Position level (e.g., Junior, Senior)
+  photograph              String?  // URL or path to the user's photograph
+  salary                  Float?   // Salary of the user
+  educationalLevel        String?  // Educational level (e.g., Bachelor's, Master's)
+  directDepositInfo       String?  // Direct deposit information (e.g., bank details)
+  cv         String?  // URL or path to CV or certificates (PDF)
+  createdAt               DateTime @default(now()) // Timestamp when the user was created
+  updatedAt               DateTime @updatedAt // Timestamp when the user was last updated
+
+  // Relationships
+  departmentId            Int?     // Foreign key to Department
+  department              Department? @relation(fields: [departmentId], references: [id])
+}
+
+
+model Department {
+  id          Int      @id @default(autoincrement())
+  name        String   @unique // Name of the department
+  users       User[]   // Users associated with this department
+}
+
+enum Role {
+  Employee
+  HRAdmin
+  Supervisor
+}
+enum Gender {
+  Male
+  Female
+}
+
+enum MaritalStatus {
+  Single
+  Married
+  Divorced
+  Widowed
+}
+
+enum PositionLevel {
+  Junior
+  Mid
+  Senior
+}

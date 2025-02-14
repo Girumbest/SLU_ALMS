@@ -1,0 +1,20 @@
+.input {
+    @apply w-full p-3 pl-10 border rounded-md bg-gray-100 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:bg-white;
+  }
+  
+  .input-group {
+    @apply relative flex items-center;
+  }
+  
+  .input-icon {
+    @apply absolute left-3 text-gray-500;
+  }
+  
+  button {
+    @apply w-full text-center font-semibold;
+  }
+.error-message{
+    position: absolute;
+    bottom: -20px;
+    left: 10px;
+}
