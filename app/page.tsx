@@ -25,6 +25,7 @@ export default function Home() {
             .
           </li>
           <li><Link href={"/admin/employees/new"}>New Employee</Link></li>
+          <li><Link href={"/admin/"}>Admin</Link></li>
         </ol>
 
         <div className="flex gap-4 items-center flex-col sm:flex-row">

@@ -148,7 +148,7 @@ const EmployeeTable: React.FC<{ employees: Employee[] }> = ({ employees }) => {
                     </td>
                   ))}
 
-                  <td className="p-3 text-center">
+                  <td className="p-3 text-center flex">
                     <button className="text-blue-600 hover:text-blue-800 mx-1"><FaEye size={18} /></button>
                     <button className="text-green-600 hover:text-green-800 mx-1"><FaUserEdit size={18} /></button>
                     <button className="text-red-600 hover:text-red-800 mx-1"><FaTrash size={18} /></button>
@@ -167,7 +167,7 @@ const EmployeeTable: React.FC<{ employees: Employee[] }> = ({ employees }) => {
       {/* Pagination Controls */}
       <div className="flex justify-between items-center mt-4">
         <button
-          className="px-4 py-2 bg-blue-600 text-white rounded disabled:opacity-50"
+          className="px-4 py-2 bg-blue-600 text-white rounded disabled:opacity-50 w-24"
           disabled={currentPage === 1}
           onClick={() => setCurrentPage((prev) => Math.max(prev - 1, 1))}
         >
@@ -179,7 +179,7 @@ const EmployeeTable: React.FC<{ employees: Employee[] }> = ({ employees }) => {
         </span>
 
         <button
-          className="px-4 py-2 bg-blue-600 text-white rounded disabled:opacity-50"
+          className="px-4 py-2 bg-blue-600 text-white rounded disabled:opacity-50 w-24"
           disabled={currentPage === totalPages}
           onClick={() => setCurrentPage((prev) => Math.min(prev + 1, totalPages))}
         >

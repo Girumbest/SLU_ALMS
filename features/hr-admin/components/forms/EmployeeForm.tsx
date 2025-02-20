@@ -33,9 +33,9 @@ export default function EmployeeRegisterForm() {
     if(state.successMsg){
       toast.success(state.successMsg)
       // Request the form to reset once the action has completed
-      formRef.current?.reset();
-    }else if(state.message){
-      toast.error(state.message)
+      // formRef.current?.reset();
+    }else if(state.errorMsg){
+      toast.error(state.errorMsg)
     }
   },[state]);
 
@@ -229,7 +229,7 @@ export default function EmployeeRegisterForm() {
           <label className="font-semibold text-gray-700 flex items-center">
             <FaUpload className="mr-2 text-blue-600" /> Upload Certificates (PDF):
           </label>
-          <input type="file" accept="application/pdf" name="certificates" multiple className="input mt-2 bg-white" />
+          <input type="file" accept="application/pdf" name="cv" className="input mt-2 bg-white" />
         </div>
 
         <button type="submit" className="col-span-1 md:col-span-2 bg-blue-600 text-white p-3 rounded-lg hover:bg-blue-700 transition" disabled={isPending}>

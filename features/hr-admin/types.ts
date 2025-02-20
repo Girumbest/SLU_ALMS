@@ -1,6 +1,6 @@
 export type UserFormState = {
     errors?: Record<string, string[]>;
-    message?: string;
+    errorMsg?: string;
     successMsg?: string;
     data?: any
 }

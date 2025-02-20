@@ -1,3 +1,4 @@
+import { randomBytes } from 'crypto';
 
 export function generatePassword(len=8, upper=true, nums=false, special=false){
         const lower = "abcdefghijklmnopqrstuvwxyz";
@@ -23,3 +24,11 @@ export function generatePassword(len=8, upper=true, nums=false, special=false){
 export function generateUsername(fname?:string, lname?:string){
     return (fname + "_" + lname?.substring(0,2)).toLowerCase().replace(/\s/g, "");
 }
+
+
+export const generateUniqueFileName = (originalName: string): string => {
+  const timestamp = Date.now();
+  const randomString = randomBytes(8).toString('hex'); // Generates a random 16-character string
+  const fileExtension = originalName.split('.').pop(); // Extracts the file extension
+  return `${timestamp}-${randomString}.${fileExtension}`;
+};

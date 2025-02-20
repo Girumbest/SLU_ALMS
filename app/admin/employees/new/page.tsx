@@ -4,7 +4,7 @@ import EmployeeRegisterForm from '@/features/hr-admin/components/forms/EmployeeF
 
 export default function RegisterPage() {
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gray-200">
+    <div className="min-h-screen flex items-center justify-center ">
       <EmployeeRegisterForm />
     </div>
   );
