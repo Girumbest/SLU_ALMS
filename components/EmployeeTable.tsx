@@ -1,4 +1,5 @@
 "use client"
+import Link from "next/link";
 import React, { useState } from "react";
 import { FaUserEdit, FaTrash, FaEye, FaSearch, FaChevronDown } from "react-icons/fa";
 
@@ -7,12 +8,12 @@ interface Employee {
   firstName: string;
   lastName: string;
   username: string;
-  phoneNumber: string;
-  jobTitle: string;
-  department: string;
+  phoneNumber: string | null;
+  jobTitle: string | null;
+  department: {name:string} | null;
   role: string;
-  salary: number;
-  hireDate: string;
+  salary: number | null;
+  hireDate: Date | null;
   photograph?: string;
 }
 
@@ -96,7 +97,7 @@ const EmployeeTable: React.FC<{ employees: Employee[] }> = ({ employees }) => {
                     >
                       <option value="">All</option>
                       {departments.map((dept) => (
-                        <option key={dept} value={dept}>{dept}</option>
+                        <option key={dept?.name} value={dept?.name}>{dept?.name}</option>
                       ))}
                     </select>
                   )}
@@ -135,7 +136,8 @@ const EmployeeTable: React.FC<{ employees: Employee[] }> = ({ employees }) => {
                 <tr key={employee.id} className={`border-b ${index % 2 === 0 ? "bg-gray-100" : "bg-white"} hover:bg-gray-200`}>
                   <td className="p-3">
                     <img
-                      src={employee.photograph || "/default-profile.png"}
+                      suppressHydrationWarning
+                      src={"/api/photos/" + employee.photograph || "/default-profile.png"}
                       alt={`${employee.firstName} ${employee.lastName}`}
                       className="w-12 h-12 object-cover rounded-full border-2 border-gray-300"
                     />
@@ -144,12 +146,12 @@ const EmployeeTable: React.FC<{ employees: Employee[] }> = ({ employees }) => {
                   <td className="p-3 font-semibold text-gray-900 whitespace-nowrap">{employee.firstName} {employee.lastName}</td>
                   {["username", "phoneNumber", "jobTitle", "department", "role", "salary", "hireDate"].map((field) => (
                     <td key={field} className="p-3 text-gray-600 truncate max-w-[150px]" title={employee[field as keyof Employee]?.toString()}>
-                      {field === "salary" ? `$${employee.salary.toLocaleString()}` : employee[field as keyof Employee]?.toString()}
+                      {field === "salary" ? `$${employee.salary?.toLocaleString()}` : employee[field as keyof Employee]?.toString()}
                     </td>
                   ))}
 
                   <td className="p-3 text-center flex">
-                    <button className="text-blue-600 hover:text-blue-800 mx-1"><FaEye size={18} /></button>
+                    <Link href={`./employees/${employee.username}`} className="text-blue-600 hover:text-blue-800 mx-1"><FaEye size={18} /></Link>
                     <button className="text-green-600 hover:text-green-800 mx-1"><FaUserEdit size={18} /></button>
                     <button className="text-red-600 hover:text-red-800 mx-1"><FaTrash size={18} /></button>
                   </td>

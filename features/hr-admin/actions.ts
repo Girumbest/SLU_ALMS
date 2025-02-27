@@ -4,7 +4,7 @@ import { promises as fs } from 'fs';
 import path from 'path';
 
 import {prisma} from "@/lib/db"
-import { employeeSchema } from './schema';
+import { departmentSchema, employeeSchema } from './schema';
 import { UserFormState } from "./types";
 import { writeFile } from "fs/promises";
 import { generateUniqueFileName } from '@/utils/generate';
@@ -44,13 +44,15 @@ export async function createUser(prevState: UserFormState, formData: FormData):P
       username: data.username,
       password: data.password,
       address: data.address,
-      dateOfBirth: data.dateOfBirth,
+      dateOfBirth: new Date(data.dateOfBirth),
       gender: data.gender,
+      phoneNumber: data.phoneNumber,
       emergencyContactPhone: data.emergencyContactPhone,
-      hireDate: data.hireDate,
+      hireDate: new Date(data.hireDate),
       jobTitle: data.jobTitle,
       maritalStatus: data.maritalStatus,
       departmentId: data.department, 
+      role: data.role,
 
       photograph: await savePhoto(data.photograph),
     }
@@ -61,7 +63,31 @@ export async function createUser(prevState: UserFormState, formData: FormData):P
 
 export async function createDepartment(prevState: UserFormState, formData: FormData):Promise<UserFormState> {
   const rawData = Object.fromEntries(formData.entries());
+  const validatedData = departmentSchema.safeParse(rawData);
+  console.log(rawData)
+  if (!validatedData.success) {
+    
+    return {
+      errorMsg: 'Validation failed',
+      errors: validatedData.error.flatten().fieldErrors,
+    };
+  }
+  let data = validatedData.data;
 
+
+  const existingDepartment = await prisma.department.findUnique({
+    where: { name: data.name },
+  });
+
+  if (existingDepartment) {
+    return {errorMsg: "A department with the same name already exists."};
+  }
+
+  await prisma.department.create({
+    data: {
+      name: data.name,
+    }
+  })
   return {successMsg: 'Department created successfully!'}
 }
 

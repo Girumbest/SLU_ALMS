@@ -1,4 +1,5 @@
 import EmployeeInfoCard from "@/components/EmployeeInfoCard";
+import { getEmployeeByUsername } from "@/lib/db-ops";
 
 const employeeData = {
   firstName: "John",
@@ -22,10 +23,11 @@ const employeeData = {
   photograph: "/images/johndoe.jpg",
 };
 
-export default function EmployeePage() {
+export default async function EmployeePage({params}: {params:{employeeId:string}}) {
+  const employee = await getEmployeeByUsername(params.employeeId)
   return (
     <div className="p-8 bg-gray-100 min-h-screen">
-      <EmployeeInfoCard employee={employeeData} />
+      <EmployeeInfoCard employee={employee} />
     </div>
   );
 }

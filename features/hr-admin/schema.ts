@@ -47,7 +47,7 @@ export const employeeSchema = z.object({
   positionLevel: z.enum(["Junior", "Mid", "Senior"]),
   salary: z.coerce.number().min(1000, "Salary must be greater than 1000"),
   department: z.coerce.number(),//z.string().min(2, "Select department"),
-  role: z.enum(["Employee", "Supervisor", "HRAdmin"]),
+  role: z.enum(["Employee", "Supervisor", "HRAdmin"]).optional(),
   educationalLevel: z.string().optional(),
   directDepositInfo: z.string().optional(),
   // certificates: z.array(z.instanceof(File)).optional(),
@@ -56,6 +56,17 @@ export const employeeSchema = z.object({
 });
 
 export const departmentSchema = z.object({
-  name: z.string().min(2, "First Name must be at least 2 characters"),
-  description: z.string().min(2, "Last Name must be at least 2 characters"),
+  name: z.string().min(2, "Department Name must be at least 2 characters"),
+  nameAmharic: z.preprocess(
+    (val) => (val === "" ? undefined : val), // Transform empty string to undefined
+    z.string().min(2, "Department Name must be at least 2 characters").optional()
+  ),
+  description: z.preprocess(
+      (val) => (val === "" ? undefined : val), // Transform empty string to undefined
+      z.string().min(5, "Description must be at least 5 characters").optional()
+    ),
+  supervisor: z.preprocess(
+    (val) => (val === "" ? undefined : val),
+    z.coerce.number().min(10, "Invalid supervisor id").optional()
+  ),
 });

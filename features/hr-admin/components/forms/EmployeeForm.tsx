@@ -9,23 +9,31 @@ import toast from "react-hot-toast";
 
 import SearchableDropdown from "@/components/SearchableDropdown";
 import { generatePassword, generateUsername } from "@/utils/generate";
+import { getDepartments } from "@/lib/db-ops";
 
 //TODO: Get departments from the database
-const departments = [{name: "Apple", id: "an apples id"}, {name: "Banana"}, {name: "Cherry"}, {name: "Date"}, {name: "Grape"}, {name: "Mango"}, {name: "Orange"}];
+
+// const departments = [{name: "Apple", id: "an apples id"}, {name: "Banana"}, {name: "Cherry"}, {name: "Date"}, {name: "Grape"}, {name: "Mango"}, {name: "Orange"}];
 
 
 const initialState: UserFormState = {}
-export default function EmployeeRegisterForm() {
+
+export default function EmployeeRegisterForm({departments}: {departments: {name:string, id:string}[]}) {
+
   const [state, formAction] = useActionState(createUser, initialState);
   const formRef = useRef<HTMLFormElement>(null);
 
 // use isPending instead of `useFormStatus().pending`
   const [isPending, startTransition] = useTransition();
 
+  //Used for setting generated username(from fname & lname)
   const fnameRef = useRef<HTMLInputElement>(null);
   const lnameRef = useRef<HTMLInputElement>(null);
   const usernameRef = useRef<HTMLInputElement>(null);
+
+  //for eye icon
   const [isHiddenPassword, setIsHiddenPassword] = useState(true);
+  
   const [photoPreview, setPhotoPreview] = useState<string | null>(null);
 
   useEffect(()=>{
@@ -192,7 +200,7 @@ export default function EmployeeRegisterForm() {
 
       <div className="input-group">
         <select name="role" className="input bg-white">
-          <option value="Employee">Select Role</option>
+          <option value="">Select Role</option>
           <option value="Employee">Employee</option>
           <option value="Supervisor">Supervisor</option>
         </select>

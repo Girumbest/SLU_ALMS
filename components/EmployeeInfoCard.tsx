@@ -1,3 +1,4 @@
+import Link from "next/link";
 import React from "react";
 import { FaUser, FaPhone, FaEnvelope, FaBirthdayCake, FaMapMarkerAlt, FaBriefcase, FaMoneyBillWave, FaBuilding, FaGraduationCap, FaFilePdf } from "react-icons/fa";
 
@@ -6,32 +7,33 @@ interface Employee {
   lastName: string;
   username: string;
   phoneNumber: string;
-  dateOfBirth: string;
+  dateOfBirth: Date | null;
   gender: string;
-  maritalStatus?: string;
-  emergencyContactName?: string;
-  emergencyContactPhone?: string;
-  address: string;
-  hireDate: string;
-  jobTitle: string;
-  positionLevel: string;
-  salary: number;
-  department: string;
+  maritalStatus?: string | null;
+  emergencyContactName?: string | null;
+  emergencyContactPhone?: string | null;
+  address: string | null;
+  hireDate: string | Date | null;
+  jobTitle: string | null;
+  positionLevel: string | null;
+  salary: number | null;
+  department: {name: string} | null;
   role: string;
-  educationalLevel?: string;
-  directDepositInfo?: string;
-  certificates?: string[];
+  educationalLevel?: string | null;
+  directDepositInfo?: string | null;
+  cv?: string | null;
   photograph?: string;
 }
 
-const EmployeeInfoCard: React.FC<{ employee: Employee }> = ({ employee }) => {
+const EmployeeInfoCard: React.FC<{ employee: Employee | null }> = ({ employee }) => {
+  if(!employee)return <div></div>
   return (
     <div className="max-w-4xl mx-auto bg-white shadow-lg rounded-lg overflow-hidden p-8">
       {/* Header Section */}
       <div className="flex flex-col md:flex-row items-center md:items-start">
         {/* Profile Photo */}
         <img
-          src={employee.photograph || "/default-profile.png"} // Fallback image
+          src={"/api/photos/" + employee.photograph || "/default-profile.png"} // Fallback image
           alt={`${employee.firstName} ${employee.lastName}`}
           className="w-32 h-40 object-cover rounded-lg border-2 border-gray-300"
         />
@@ -46,7 +48,7 @@ const EmployeeInfoCard: React.FC<{ employee: Employee }> = ({ employee }) => {
             <FaBriefcase /> {employee.jobTitle}
           </p>
           <p className="text-gray-600 text-sm flex items-center gap-2">
-            <FaBuilding /> {employee.department}
+            <FaBuilding /> {employee.department?.name}
           </p>
         </div>
       </div>
@@ -61,7 +63,7 @@ const EmployeeInfoCard: React.FC<{ employee: Employee }> = ({ employee }) => {
               <FaPhone className="text-blue-500" /> {employee.phoneNumber}
             </p>
             <p className="text-gray-600 flex items-center gap-2">
-              <FaBirthdayCake className="text-red-500" /> {employee.dateOfBirth}
+              <FaBirthdayCake className="text-red-500" /> {employee.dateOfBirth?.}
             </p>
             <p className="text-gray-600 flex items-center gap-2">
               <FaUser className="text-green-500" /> {employee.gender} - {employee.maritalStatus || "N/A"}
@@ -80,7 +82,7 @@ const EmployeeInfoCard: React.FC<{ employee: Employee }> = ({ employee }) => {
               <FaBriefcase className="text-purple-500" /> Position: {employee.positionLevel}
             </p>
             <p className="text-gray-600 flex items-center gap-2">
-              <FaMoneyBillWave className="text-green-500" /> Salary: ${employee.salary.toLocaleString()}
+              <FaMoneyBillWave className="text-green-500" /> Salary: ${employee.salary?.toLocaleString()}
             </p>
             <p className="text-gray-600 flex items-center gap-2">
               <FaBuilding className="text-indigo-500" /> Role: {employee.role}
@@ -88,6 +90,9 @@ const EmployeeInfoCard: React.FC<{ employee: Employee }> = ({ employee }) => {
             <p className="text-gray-600 flex items-center gap-2">
               <FaGraduationCap className="text-blue-500" /> Education: {employee.educationalLevel || "N/A"}
             </p>
+            <Link href={`${employee.cv!}`} target="_blank" rel="noopener noreferrer" className="text-blue-600 underline flex items-center gap-2">
+                  <FaFilePdf className="text-red-500" /> View CV
+            </Link>
           </div>
         </div>
       </div>
@@ -96,7 +101,7 @@ const EmployeeInfoCard: React.FC<{ employee: Employee }> = ({ employee }) => {
       <div className="mt-6">
         <h3 className="text-lg font-semibold text-gray-700 mb-2">Emergency Contact</h3>
         <p className="text-gray-600 flex items-center gap-2">
-          <FaUser className="text-red-500" /> {employee.emergencyContactName || "N/A"}
+          <FaUser className="text-red-500" /> {employee?.emergencyContactName || "N/A"}
         </p>
         <p className="text-gray-600 flex items-center gap-2">
           <FaPhone className="text-blue-500" /> {employee.emergencyContactPhone || "N/A"}
@@ -104,7 +109,7 @@ const EmployeeInfoCard: React.FC<{ employee: Employee }> = ({ employee }) => {
       </div>
 
       {/* Certificates */}
-      {employee.certificates && employee.certificates.length > 0 && (
+      {/* {employee.certificates && employee.certificates.length > 0 && (
         <div className="mt-6">
           <h3 className="text-lg font-semibold text-gray-700 mb-2">Certificates</h3>
           <ul className="list-disc list-inside text-gray-600">
@@ -117,7 +122,8 @@ const EmployeeInfoCard: React.FC<{ employee: Employee }> = ({ employee }) => {
             ))}
           </ul>
         </div>
-      )}
+      )} */}
+      
     </div>
   );
 };

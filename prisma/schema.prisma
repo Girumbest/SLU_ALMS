@@ -19,10 +19,10 @@ model User {
   lastName                String   // Last name of the user
   username                String   @unique // Unique username for login
   password                String   // Hashed password for security
-  phoneNumber             String?  // Optional phone number
+  phoneNumber             String  // Optional phone number
   dateOfBirth             DateTime? // Date of birth
-  gender                  String?  // Gender (e.g., Male, Female, Other)
-  maritalStatus           String?  // Marital status (e.g., Single, Married)
+  gender                  Gender  // Gender (e.g., Male, Female, Other)
+  maritalStatus           MaritalStatus?  // Marital status (e.g., Single, Married)
   emergencyContactName    String?  // Name of emergency contact
   emergencyContactPhone   String?  // Phone number of emergency contact
   address                 String?  // Address of the user
@@ -30,11 +30,11 @@ model User {
   jobTitle                String?  // Job title of the user
   role                    Role      @default(Employee)
   positionLevel           String?  // Position level (e.g., Junior, Senior)
-  photograph              String?  // URL or path to the user's photograph
+  photograph              String  // URL or path to the user's photograph
   salary                  Float?   // Salary of the user
   educationalLevel        String?  // Educational level (e.g., Bachelor's, Master's)
   directDepositInfo       String?  // Direct deposit information (e.g., bank details)
-  cv         String?  // URL or path to CV or certificates (PDF)
+  cv                      String?  // URL or path to CV or certificates (PDF)
   createdAt               DateTime @default(now()) // Timestamp when the user was created
   updatedAt               DateTime @updatedAt // Timestamp when the user was last updated
 
@@ -47,6 +47,11 @@ model User {
 model Department {
   id          Int      @id @default(autoincrement())
   name        String   @unique // Name of the department
+  nameAmharic String?  
+  description String?
+  createdAt               DateTime @default(now()) // Timestamp when the user was created
+  updatedAt               DateTime? @updatedAt // Timestamp when the user was last updated
+
   users       User[]   // Users associated with this department
 }
 
