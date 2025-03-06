@@ -1,4 +1,5 @@
 "use client"
+import Link from "next/link";
 import React, { useState } from "react";
 import { FaUserEdit, FaTrash, FaEye, FaSearch, FaChevronDown } from "react-icons/fa";
 
@@ -101,8 +102,8 @@ const DepartmentTable: React.FC<{ departments: Department[] }> = ({ departments 
                     </td>
                   ))}
 
-                  <td className="p-3 text-center">
-                    <button className="text-blue-600 hover:text-blue-800 mx-1"><FaEye size={18} /></button>
+                  <td className="p-3 text-center flex">
+                    <Link href={`/admin/departments/${department.id}`} className="text-blue-600 hover:text-blue-800 mx-1"><FaEye size={18} /></Link>
                     <button className="text-green-600 hover:text-green-800 mx-1"><FaUserEdit size={18} /></button>
                     <button className="text-red-600 hover:text-red-800 mx-1"><FaTrash size={18} /></button>
                   </td>

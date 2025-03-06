@@ -61,6 +61,12 @@ export async function createUser(prevState: UserFormState, formData: FormData):P
   return { successMsg: 'Form submitted successfully!' };
 }
 
+export async function editUser(prevState: UserFormState, formData: FormData):Promise<UserFormState> {
+  const rawData = Object.fromEntries(formData.entries());
+  return {successMsg: 'Form submitted successfully!'}
+}
+
+
 export async function createDepartment(prevState: UserFormState, formData: FormData):Promise<UserFormState> {
   const rawData = Object.fromEntries(formData.entries());
   const validatedData = departmentSchema.safeParse(rawData);

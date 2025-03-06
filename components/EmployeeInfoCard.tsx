@@ -63,7 +63,7 @@ const EmployeeInfoCard: React.FC<{ employee: Employee | null }> = ({ employee })
               <FaPhone className="text-blue-500" /> {employee.phoneNumber}
             </p>
             <p className="text-gray-600 flex items-center gap-2">
-              <FaBirthdayCake className="text-red-500" /> {employee.dateOfBirth?.}
+              <FaBirthdayCake className="text-red-500" /> {employee.dateOfBirth?.toDateString()}
             </p>
             <p className="text-gray-600 flex items-center gap-2">
               <FaUser className="text-green-500" /> {employee.gender} - {employee.maritalStatus || "N/A"}

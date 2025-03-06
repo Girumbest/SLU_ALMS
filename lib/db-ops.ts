@@ -8,7 +8,8 @@ export async function getEmployeeByUsername(username:string){
     include: {
       department:{
         select:{
-          name: true
+          name: true,
+          id: true
         }
       }
     }
@@ -37,6 +38,33 @@ export async function getEmployees(){
     
   })
 return employees
+}
+
+export async function getDepartment(id: number) {
+  const employees = await prisma.department.findUnique({
+    where: {
+      id,
+    },
+    select: {
+      name: true,
+      users: {
+        select:{
+          id: true,
+          firstName: true,
+          lastName: true,
+          username: true,
+          phoneNumber: true,
+          jobTitle: true,
+          role: true,
+          salary: true,
+          hireDate: true,
+          photograph: true,
+        }
+      }
+    }
+  });
+
+  return employees;
 }
 
 export async function getDepartments() {

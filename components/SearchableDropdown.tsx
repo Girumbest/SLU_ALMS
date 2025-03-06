@@ -5,11 +5,13 @@ type select = {
   options: { name: string; id?: string }[]; //drop down items
   inputElementName: string; //<input> name used in a form submission
   title: string; //title for the drop down
+  default?: {name: string; id:string};
 };
 
 export default function SearchableDropdown(props:select) {
   const [search, setSearch] = useState<string>("");
-  const [selected, setSelected] = useState<{name: string; id:string}>({name:"", id: ""});
+  const [selected, setSelected] = useState<{name: string; id:string}>(props.default || {name: "", id: ""});
+  // props.default?.id && setSelected(props.default);//for employee update form
   const [isOpen, setIsOpen] = useState<boolean>(false);
 
   const filteredOptions = props.options.filter(option =>
@@ -22,7 +24,7 @@ export default function SearchableDropdown(props:select) {
         className=" flex justify-between items-center  p-3 pl-10 border rounded-md bg-gray-100 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:bg-white"
         onClick={() => setIsOpen(!isOpen)}
       >
-        <input className="cursor-default" name={props.inputElementName} type="hidden" value={selected.id || ""}/>
+        <input className="cursor-default" name={props.inputElementName} type="hidden" value={selected.id ||  ""}/>
         <span className="cursor-default">{selected.name || props.title}</span>
         <FaChevronDown className="absolute right-1.5 w-2.5 h-2.5" />
       </div>

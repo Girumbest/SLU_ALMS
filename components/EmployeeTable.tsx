@@ -15,9 +15,10 @@ interface Employee {
   salary: number | null;
   hireDate: Date | null;
   photograph?: string;
+
 }
 
-const EmployeeTable: React.FC<{ employees: Employee[] }> = ({ employees }) => {
+const EmployeeTable: React.FC<{ employees: Employee[] }> = ( {employees}) => {
   const [filters, setFilters] = useState<{ [key: string]: string }>({});
   const [showDatePicker, setShowDatePicker] = useState(false);
   const [currentPage, setCurrentPage] = useState(1);
@@ -50,7 +51,7 @@ const EmployeeTable: React.FC<{ employees: Employee[] }> = ({ employees }) => {
 
   return (
     <div className="max-w-7xl mx-auto bg-white shadow-lg rounded-lg p-6">
-      <h2 className="text-2xl font-bold text-gray-800 mb-4">Registered Employees</h2>
+      <h2 className="text-2xl font-bold text-gray-800 mb-4">{title || "Registered Employees"}</h2>
 
       {/* Responsive Table */}
       <div className="overflow-x-auto">
@@ -59,7 +60,7 @@ const EmployeeTable: React.FC<{ employees: Employee[] }> = ({ employees }) => {
           <thead>
             <tr className="bg-blue-600 text-white text-left">
               {["Photo", "Name", "Username", "Phone", "Job Title", "Department", "Role", "Salary", "Hire Date", "Actions"].map((header, index) => (
-                <th key={index} className="p-3 relative">{header}</th>
+                !optionalHeaders?.includes(header) && <th key={index} className="p-3 relative">{header}</th>
               ))}
             </tr>
             
@@ -152,7 +153,7 @@ const EmployeeTable: React.FC<{ employees: Employee[] }> = ({ employees }) => {
 
                   <td className="p-3 text-center flex">
                     <Link href={`./employees/${employee.username}`} className="text-blue-600 hover:text-blue-800 mx-1"><FaEye size={18} /></Link>
-                    <button className="text-green-600 hover:text-green-800 mx-1"><FaUserEdit size={18} /></button>
+                    <Link href={`./employees/edit/${employee.username}`} className="text-green-600 hover:text-green-800 mx-1"><FaUserEdit size={18} /></Link>
                     <button className="text-red-600 hover:text-red-800 mx-1"><FaTrash size={18} /></button>
                   </td>
                 </tr>
