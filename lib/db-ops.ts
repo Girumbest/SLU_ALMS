@@ -16,8 +16,14 @@ export async function getEmployeeByUsername(username:string){
   })
   return employees
 }
-export async function getEmployees(){
+
+
+
+export async function getEmployees(employeesPerPage=2, page=1) {
   const employees = await prisma.user.findMany({
+    skip: (page - 1) * employeesPerPage,
+    take: employeesPerPage,
+    //_count
     select:{
       id: true,
       firstName: true,
@@ -36,17 +42,20 @@ export async function getEmployees(){
       }
     },
     
+    
   })
+  const total = await prisma.user.count();
+  (employees as any).total = total;
+  
 return employees
 }
 
 export async function getDepartment(id: number) {
-  const employees = await prisma.department.findUnique({
+  const departments = await prisma.department.findUnique({
     where: {
       id,
     },
-    select: {
-      name: true,
+    include: {
       users: {
         select:{
           id: true,
@@ -59,12 +68,11 @@ export async function getDepartment(id: number) {
           salary: true,
           hireDate: true,
           photograph: true,
-        }
       }
-    }
+    }}
   });
 
-  return employees;
+  return departments;
 }
 
 export async function getDepartments() {

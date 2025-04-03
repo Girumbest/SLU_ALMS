@@ -90,9 +90,9 @@ const EmployeeInfoCard: React.FC<{ employee: Employee | null }> = ({ employee })
             <p className="text-gray-600 flex items-center gap-2">
               <FaGraduationCap className="text-blue-500" /> Education: {employee.educationalLevel || "N/A"}
             </p>
-            <Link href={`${employee.cv!}`} target="_blank" rel="noopener noreferrer" className="text-blue-600 underline flex items-center gap-2">
+            {(employee?.cv &&(<Link href={`/api/cv/${employee.cv}`} target="_blank" rel="noopener noreferrer" className="text-blue-600 underline flex items-center gap-2">
                   <FaFilePdf className="text-red-500" /> View CV
-            </Link>
+            </Link>)) || (<p className="text-gray-600 flex items-center gap-2"><FaFilePdf className="text-red-500" /> CV: N/A</p>)}
           </div>
         </div>
       </div>

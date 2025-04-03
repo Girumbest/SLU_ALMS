@@ -17,14 +17,36 @@ const AdminSidebar = () => {
 
   const mainMenu = [
     { name: "Dashboard", icon: <FaHome />, path: "/admin/dashboard" },
+    // { name: "Employees", icon: <FaUsers />, path: "/admin/employees" },
+    // { name: "Departments", icon: <FaBuilding />, path: "/admin/departments" },
+  ];
+
+  const employeesMenu = [
     { name: "Employees", icon: <FaUsers />, path: "/admin/employees" },
+    { name: "Register Employee", icon: <FaUsers />, path: "/admin/employees/new" },
     { name: "Departments", icon: <FaBuilding />, path: "/admin/departments" },
+    { name: "Attendance", icon: <FaBuilding />, path: "/admin/attendance" },
   ];
 
   const settingsMenu = [
     { name: "Settings", icon: <FaCog />, path: "/admin/settings" },
     { name: "Logout", icon: <FaSignOutAlt />, path: "#" },
   ];
+
+  const isActive = (menuItem:{name:string, path:string, icon:any}) => {
+    const current = pathname.split("/").pop();
+    const employeeMenu = ["/admin/employees", "/admin/employees/edit/", `/admin/employees/edit/${current}`, `/admin/employees/${current}`]
+    const departmentMenu = ["/admin/departments", `/admin/departments/${current}`]
+    const registerEmployee = "/admin/employees/new"
+    
+    return (
+     menuItem.name === "Employees" && employeeMenu.includes(pathname) && !employeeMenu.includes(registerEmployee) ||
+     menuItem.name === "Departments" && departmentMenu.includes(pathname) ||
+     menuItem.name === "Register Employee" && registerEmployee === pathname ||
+     menuItem.path === pathname
+    )
+  };
+  
 
   return (
     <div className={`h-screen  left-0 top-0 bg-gray-900 text-white flex flex-col transition-all duration-300 ${isCollapsed ? "max-w-16" : "min-w-64"}`}>
@@ -48,7 +70,22 @@ const AdminSidebar = () => {
           <div
             key={item.name}
             className={`flex items-center p-3 cursor-pointer hover:bg-gray-700 transition-all ${
-              pathname === item.path ? "bg-blue-600" : ""
+              pathname === item.path || isActive(item) ? "bg-blue-600" : ""
+            }`}
+            onClick={() => router.push(item.path)}
+          >
+            <span className="text-lg">{item.icon}</span>
+            {!isCollapsed && <span className="ml-3">{item.name}</span>}
+          </div>
+        ))}
+
+        {/* Employee Management*/}
+        <p className={`text-gray-400 ${isCollapsed ? "hidden" : "px-4 text-xs uppercase"}`}>Employee Management</p>
+        {employeesMenu.map((item) => (
+          <div
+            key={item.name}
+            className={`flex items-center p-3 cursor-pointer hover:bg-gray-700 transition-all ${
+             isActive(item) ? "bg-blue-600" : ""
             }`}
             onClick={() => router.push(item.path)}
           >

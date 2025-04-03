@@ -29,7 +29,8 @@ const DepartmentForm = ({supervisors}:{supervisors:{id:string, name:string}[]}) 
     if(state.successMsg){
       toast.success(state.successMsg)
       // Request the form to reset once the action has completed
-      // formRef.current?.reset();
+      formRef.current?.reset();
+      
     }else if(state.errorMsg){
       toast.error(state.errorMsg)
     }
@@ -47,7 +48,7 @@ const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
   return (
     <div className="bg-white shadow-md rounded-lg p-6 mb-6">
         <h3 className="text-xl font-semibold text-gray-700 mb-4">Add New Department</h3>
-        <form onSubmit={handleSubmit} className="grid grid-cols-2 gap-4">
+        <form ref={formRef} onSubmit={handleSubmit} className="grid grid-cols-2 gap-4">
           <div className='flex flex-col relative'>
           <input type="text" name="name" placeholder="Department Name" className="p-2 border rounded" required />
           {state.errors?.name && <p className="text-red-500 text-sm error-message -bottom-30">{state.errors.name [0]}</p>}

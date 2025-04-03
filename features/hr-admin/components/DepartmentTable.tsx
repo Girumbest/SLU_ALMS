@@ -1,7 +1,9 @@
 "use client"
 import Link from "next/link";
 import React, { useState } from "react";
+import toast from "react-hot-toast";
 import { FaUserEdit, FaTrash, FaEye, FaSearch, FaChevronDown } from "react-icons/fa";
+import { deleteDepartment } from "../actions";
 
 interface Department {
     id: number;
@@ -23,7 +25,14 @@ const DepartmentTable: React.FC<{ departments: Department[] }> = ({ departments 
 
   // Handle input change for search filters
   const handleFilterChange = (column: string, value: string) => {
-    setFilters((prev) => ({ ...prev, [column]: value.toLowerCase() }));
+    let key = column
+    switch(column){
+      case "departmentname": key = "name"; break;
+      case "no.employees": key = "employeeCount"; break;
+      case "datecreated": key = "dateCreated"; break;
+    }
+    setFilters((prev) => ({ ...prev, [key]: value.toLowerCase() }));
+    console.log(filters)
   };
 
   // Filter departments based on search input
@@ -35,6 +44,16 @@ const DepartmentTable: React.FC<{ departments: Department[] }> = ({ departments 
     )
   );
 
+  const handleDelete = async (id: number) => {
+    if (window.confirm("Are you sure you want to delete this department?")) {
+      const res = await deleteDepartment(id);
+      if (res.successMsg) {
+        toast.success(res.successMsg)
+      } else {
+        toast.error(res.errorMsg)
+      }
+    }
+  };
  
 
   return (
@@ -90,8 +109,8 @@ const DepartmentTable: React.FC<{ departments: Department[] }> = ({ departments 
 
           {/* Table Body */}
           <tbody>
-            {departments.length > 0 ? (
-              departments.map((department, index) => (
+            {filteredDepartments.length > 0 ? (
+              filteredDepartments.map((department, index) => (
                 <tr key={department.id} className={`border-b ${index % 2 === 0 ? "bg-gray-100" : "bg-white"} hover:bg-gray-200`}>
                   
 
@@ -104,8 +123,8 @@ const DepartmentTable: React.FC<{ departments: Department[] }> = ({ departments 
 
                   <td className="p-3 text-center flex">
                     <Link href={`/admin/departments/${department.id}`} className="text-blue-600 hover:text-blue-800 mx-1"><FaEye size={18} /></Link>
-                    <button className="text-green-600 hover:text-green-800 mx-1"><FaUserEdit size={18} /></button>
-                    <button className="text-red-600 hover:text-red-800 mx-1"><FaTrash size={18} /></button>
+                    {/* <button className="text-green-600 hover:text-green-800 mx-1"><FaUserEdit size={18} /></button> */}
+                    <button className="text-red-600 hover:text-red-800 mx-1" onClick={e => handleDelete(department.id)}><FaTrash size={18} /></button>
                   </td>
                 </tr>
               ))

@@ -41,6 +41,8 @@ model User {
   // Relationships
   departmentId            Int?     // Foreign key to Department
   department              Department? @relation(fields: [departmentId], references: [id])
+  attendances             Attendance[]
+  leaveRequests           LeaveRequest[]
 }
 
 
@@ -54,6 +56,7 @@ model Department {
 
   users       User[]   // Users associated with this department
 }
+
 
 enum Role {
   Employee
@@ -76,4 +79,90 @@ enum PositionLevel {
   Junior
   Mid
   Senior
+}
+
+//////////////////
+
+model Attendance {
+  id           Int       @id @default(autoincrement())
+  userId       Int
+  date         DateTime
+  morningCheckInTime  DateTime?
+  morningCheckOutTime DateTime?
+  afternoonCheckInTime  DateTime?
+  afternoonCheckOutTime DateTime?
+  status       AttendanceStatus @default(ABSENT)
+
+  isLate      Boolean
+  isEarlyCheckout  Boolean
+  manuallyCheckedIn   Boolean
+
+  user         User      @relation(fields: [userId], references: [id])
+}
+
+
+model LeaveRequest {
+  id          Int       @id @default(autoincrement())
+  userId      Int
+  leaveTypeId Int
+  startDate   DateTime
+  endDate     DateTime
+  status      LeaveStatus @default(PENDING)
+  reason      String
+  user        User       @relation(fields: [userId], references: [id])
+  leaveType   LeaveType  @relation(fields: [leaveTypeId], references: [id])
+}
+
+model LeaveType {
+  id          Int       @id @default(autoincrement())
+  name        String
+  description String?
+  maxDays     Int
+  leaveRequests LeaveRequest[]
+}
+
+model Calendar {
+  id           Int       @id @default(autoincrement())
+  eventName    String
+  eventDate    DateTime?
+  isRecurring  Boolean   @default(false)
+  recurringDay RecurringDay?
+  eventType    EventType
+  description  String?
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
+}
+
+
+enum AttendanceStatus {
+  PRESENT
+  ABSENT
+  LATE
+}
+
+enum LeaveStatus {
+  PENDING
+  APPROVED
+  REJECTED
+}
+
+enum Language {
+  ENGLISH
+  AMHARIC
+}
+
+enum EventType {
+  HOLIDAY
+  WEEKEND
+  WORKDAY_ADJUSTMENT
+}
+
+enum RecurringDay {
+  MONDAY
+  TUESDAY
+  WEDNESDAY
+  THURSDAY
+  FRIDAY
+  SATURDAY
+  SUNDAY
 }

@@ -24,11 +24,11 @@ interface Employee {
   photograph?: string;
 }
 
-interface EmployeeTableProps {
+interface AttendanceTableProps {
   departments: { name: string; id: number }[];
 }
 
-const EmployeeTable: React.FC<EmployeeTableProps> = ({ departments }) => {
+const AttendanceTable: React.FC<AttendanceTableProps> = ({ departments }) => {
   const [currentPage, setCurrentPage] = useState(1);
   const employeesPerPage = 5;
 
@@ -90,9 +90,9 @@ const EmployeeTable: React.FC<EmployeeTableProps> = ({ departments }) => {
                 "Photo",
                 "Name",
                 "Username",
+                "Department",
                 "Phone",
                 "Job Title",
-                "Department",
                 "Role",
                 "Salary",
                 "Hire Date",
@@ -109,9 +109,9 @@ const EmployeeTable: React.FC<EmployeeTableProps> = ({ departments }) => {
                 "Photo",
                 "Name",
                 "Username",
+                "Department",
                 "Phone",
                 "Job Title",
-                "Department",
                 "Role",
                 "Salary",
                 "Hire Date",
@@ -220,9 +220,9 @@ const EmployeeTable: React.FC<EmployeeTableProps> = ({ departments }) => {
                   </td>
                   {[
                     "username",
+                    "department",
                     "phoneNumber",
                     "jobTitle",
-                    "department",
                     "role",
                     "salary",
                     "hireDate",
@@ -297,4 +297,4 @@ const EmployeeTable: React.FC<EmployeeTableProps> = ({ departments }) => {
   );
 };
 
-export default EmployeeTable;
+export default AttendanceTable;
