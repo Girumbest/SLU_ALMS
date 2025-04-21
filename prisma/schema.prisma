@@ -91,14 +91,21 @@ model Attendance {
   morningCheckOutTime DateTime?
   afternoonCheckInTime  DateTime?
   afternoonCheckOutTime DateTime?
+  checkOutEnabled Boolean @default(false)
+
   status       AttendanceStatus @default(ABSENT)
 
-  isLate      Boolean
-  isEarlyCheckout  Boolean
-  manuallyCheckedIn   Boolean
+  isLateMorningCheckIn Boolean?
+  isEarlyMorningCheckOut Boolean?
+  isLateAfternoonCheckIn Boolean?
+  isEarlyAfternoonCheckOut Boolean?
+
+  
+  manuallyCheckedIn   Boolean @default(false)
 
   user         User      @relation(fields: [userId], references: [id])
 }
+
 
 
 model LeaveRequest {
@@ -133,11 +140,29 @@ model Calendar {
   updatedAt    DateTime  @updatedAt
 }
 
+model Settings {
+  id        Int      @id @default(autoincrement())
+  key       String   @unique // Unique key for the setting
+  value     String   // Value of the setting (can be a string representation of any data type)
+  type      SettingType @default(STRING) // Type of the setting
+  description String?  // Optional description of the setting
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+enum SettingType {
+  STRING
+  NUMBER
+  BOOLEAN
+  JSON
+  DATE_TIME 
+}
+
 
 enum AttendanceStatus {
   PRESENT
   ABSENT
-  LATE
+  ON_LEAVE
 }
 
 enum LeaveStatus {

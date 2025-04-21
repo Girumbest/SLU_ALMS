@@ -3,7 +3,7 @@ import Link from "next/link";
 import React, { useEffect, useState } from "react";
 import { FaUserEdit, FaTrash, FaEye, FaSearch } from "react-icons/fa";
 import DateRangePicker from "./DateRangePicker";
-import { getEmployeesAttendance } from "@/features/hr-admin/actions";
+import { getAllAttendance, getEmployeesAttendance } from "@/features/hr-admin/actions";
 import AttendanceEditModal from "./AttendanceEditModal";
 
 interface AttendanceTime {
@@ -13,6 +13,7 @@ interface AttendanceTime {
   afternoonCheckOutTime: Date | null;
 }
 interface Attendance extends AttendanceTime {
+  id: number,
   isLateMorningCheckIn: Boolean;
   isEarlyMorningCheckOut: Boolean;
   isLateAfternoonCheckIn: Boolean;
@@ -35,9 +36,10 @@ interface Employee {
 
 interface AttendanceTableProps {
   departments: { name: string; id: number }[];
+  empId: string;
 }
 
-const AttendanceTable: React.FC<AttendanceTableProps> = ({ departments }) => {
+const AttendanceDetailTable: React.FC<AttendanceTableProps> = ({ departments, empId }) => {
   const [attendance, setAttendance] = useState<
     Employee["attendances"] | undefined
   >();
@@ -47,7 +49,7 @@ const AttendanceTable: React.FC<AttendanceTableProps> = ({ departments }) => {
   const [employeeId, setEmployeeId] = useState<number>();
 
   const openAttendanceEditModal = (
-    attendance?: Employee["attendances"],
+    attendance?: Attendance[],
     employeeId?: number
   ) => {
     setEmployeeId(employeeId);
@@ -59,7 +61,7 @@ const AttendanceTable: React.FC<AttendanceTableProps> = ({ departments }) => {
   const [rerender, setRerender] = useState(false);
 
   const [currentPage, setCurrentPage] = useState(1);
-  const employeesPerPage = 5;
+  const attendancesPerPage = 5;
 
   const [filters, setFilters] = useState<{
     filterKey: string;
@@ -70,32 +72,32 @@ const AttendanceTable: React.FC<AttendanceTableProps> = ({ departments }) => {
   });
 
   const [totalResults, setTotalPages] = useState<number>(0);
-  const [filteredEmployees, setFilteredEmployees] = useState<Employee[]>([]);
-  const [employeesAttendance, setEmployeesAttendance] = useState<Employee[]>(
+  const [filteredAttendances, setFilteredAttendances] = useState<Attendance[]>([]);
+  const [employeesAttendance, setEmployeesAttendance] = useState<Attendance[]>(
     []
   );
   const roles = ["Employee", "Supervisor"];
 
   useEffect(() => {
-    setFilters({ filterKey: "", searchValue: "" });
+    // setFilters({ filterKey: "", searchValue: "" });
     setCurrentPage(1);
     const fetchData = async () => {
-      const data = await getEmployeesAttendance(
-        // filters.searchValue,
-        "",
+      const data = await getAllAttendance(
+        Number(empId),
+        filters.searchValue,
         filters.filterKey,
-        employeesPerPage,
+        attendancesPerPage,
         currentPage,
         date
       );
-      setFilteredEmployees(data.employees);
+      setFilteredAttendances(data.employee?.attendances);
       // setEmployeesAttendance(data.employees);
       setSettings(data.settings);
       setTotalPages(data.total);
-      console.log(data);
+      console.log(filteredAttendances);
     };
     fetchData();
-  }, [date, rerender]); //[filters, currentPage, date]);
+  }, [date, filters, currentPage, rerender]); //[filters, currentPage, date]);
 
   const handleDateRangeChange = (startDate: string, endDate: string) => {
     if (!startDate && !endDate) {
@@ -110,48 +112,50 @@ const AttendanceTable: React.FC<AttendanceTableProps> = ({ departments }) => {
 
   const handleFilterChange = (column: string, value: string) => {
     setFilters({ filterKey: column, searchValue: value });
-    if (column == "name") {
-      setFilteredEmployees(
-        employeesAttendance.filter(
-          (employee) =>
-            employee.firstName.toLowerCase().includes(value.toLowerCase()) ||
-            employee.lastName.toLowerCase().includes(value.toLowerCase())
-        )
-      );
-    }
-    if (column == "username") {
-      setFilteredEmployees(
-        employeesAttendance.filter((employee) =>
-          employee.username.toLowerCase().includes(value.toLowerCase())
-        )
-      );
-    }
-    if (column == "department") {
-      setFilteredEmployees(
-        employeesAttendance.filter((employee) =>
-          employee.department?.name.toLowerCase().includes(value.toLowerCase())
-        )
-      );
-    }
+    // if (column == "name") {
+    //   setFilteredAttendances(
+    //     employeesAttendance.filter(
+    //       (employee) =>
+    //         employee.firstName.toLowerCase().includes(value.toLowerCase()) ||
+    //         employee.lastName.toLowerCase().includes(value.toLowerCase())
+    //     )
+    //   );
+    // }
+    // if (column == "username") {
+    //   setFilteredAttendances(
+    //     employeesAttendance.filter((employee) =>
+    //       employee.username.toLowerCase().includes(value.toLowerCase())
+    //     )
+    //   );
+    // }
+    // if (column == "department") {
+    //   setFilteredAttendances(
+    //     employeesAttendance.filter((employee) =>
+    //       employee.department?.name.toLowerCase().includes(value.toLowerCase())
+    //     )
+    //   );
+    // }
     if (column == "m-check-in") {
-      // alert(value)
-      setFilteredEmployees(
-        employeesAttendance.filter((employee) => {
-          return new Date(employee.attendances[0]?.morningCheckInTime!)
-            .toLocaleTimeString("en-US", {
-              hour: "2-digit",
-              minute: "2-digit",
-              hour12: false,
-            })
-            .includes(value);
-        })
-      );
+      console.log("Check-in", value)
+      setFilters({ filterKey: "morningCheckInTime", searchValue: value});
+
+      // setFilteredAttendances(
+      //   employeesAttendance.filter((attendance) => {
+      //     return new Date(attendance.morningCheckInTime!)
+      //       .toLocaleTimeString("en-US", {
+      //         hour: "2-digit",
+      //         minute: "2-digit",
+      //         hour12: false,
+      //       })
+      //       .includes(value);
+      //   })
+      // );
     }
     if (column == "m-check-out") {
       // alert(value)
-      setFilteredEmployees(
-        employeesAttendance.filter((employee) => {
-          return new Date(employee.attendances[0]?.morningCheckOutTime!)
+      setFilteredAttendances(
+        employeesAttendance.filter((attendance) => {
+          return new Date(attendance?.morningCheckOutTime!)
             .toLocaleTimeString("en-US", {
               hour: "2-digit",
               minute: "2-digit",
@@ -164,9 +168,9 @@ const AttendanceTable: React.FC<AttendanceTableProps> = ({ departments }) => {
 
     if (column == "a-check-in") {
       // alert(value)
-      setFilteredEmployees(
-        employeesAttendance.filter((employee) => {
-          return new Date(employee.attendances[0]?.afternoonCheckInTime!)
+      setFilteredAttendances(
+        employeesAttendance.filter((attendance) => {
+          return new Date(attendance?.afternoonCheckInTime!)
             .toLocaleTimeString("en-US", {
               hour: "2-digit",
               minute: "2-digit",
@@ -179,9 +183,9 @@ const AttendanceTable: React.FC<AttendanceTableProps> = ({ departments }) => {
 
     if (column == "a-check-out") {
       // alert(value)
-      setFilteredEmployees(
-        employeesAttendance.filter((employee) => {
-          return new Date(employee.attendances[0]?.afternoonCheckOutTime!)
+      setFilteredAttendances(
+        employeesAttendance.filter((attendance) => {
+          return new Date(attendance?.afternoonCheckOutTime!)
             .toLocaleTimeString("en-US", {
               hour: "2-digit",
               minute: "2-digit",
@@ -193,8 +197,8 @@ const AttendanceTable: React.FC<AttendanceTableProps> = ({ departments }) => {
     }
   };
 
-  const totalPages = Math.ceil(totalResults / employeesPerPage);
-  const paginatedEmployees = filteredEmployees;
+  const totalPages = Math.ceil(totalResults / attendancesPerPage);
+  const paginatedEmployees = filteredAttendances;
 
   return (
     <div className="max-w-7xl mx-auto bg-white shadow-lg rounded-lg p-6">
@@ -217,10 +221,7 @@ const AttendanceTable: React.FC<AttendanceTableProps> = ({ departments }) => {
           <thead>
             <tr className="bg-blue-600 text-white text-left">
               {[
-                "Photo",
-                "Name",
-                "Username",
-                "Department",
+                "Date",
                 "M-Check-In",
                 "M-Check-Out",
                 "A-Check-In",
@@ -236,10 +237,7 @@ const AttendanceTable: React.FC<AttendanceTableProps> = ({ departments }) => {
 
             <tr className="bg-gray-200">
               {[
-                "Photo",
-                "Name",
-                "Username",
-                "Department",
+                "Date",
                 "M-Check-In",
                 "M-Check-Out",
                 "A-Check-In",
@@ -266,7 +264,7 @@ const AttendanceTable: React.FC<AttendanceTableProps> = ({ departments }) => {
                             e.target.value
                           )
                         }
-                        value={
+                        defaultValue={
                           filters.filterKey !==
                           header.toLowerCase().replace(" ", "")
                             ? ""
@@ -330,14 +328,14 @@ const AttendanceTable: React.FC<AttendanceTableProps> = ({ departments }) => {
 
           <tbody>
             {paginatedEmployees.length > 0 ? (
-              paginatedEmployees.map((employee, index) => (
+              paginatedEmployees.map((attendance, index) => (
                 <tr
-                  key={employee.id}
+                  key={attendance.id}
                   className={`border-b ${
                     index % 2 === 0 ? "bg-gray-100" : "bg-white"
                   } hover:bg-gray-200`}
                 >
-                  <td className="p-3">
+                  {/* <td className="p-3">
                     <img
                       suppressHydrationWarning
                       src={
@@ -347,59 +345,12 @@ const AttendanceTable: React.FC<AttendanceTableProps> = ({ departments }) => {
                       alt={`${employee.firstName} ${employee.lastName}`}
                       className="w-12 h-12 object-cover rounded-full border-2 border-gray-300"
                     />
-                  </td>
+                  </td> */}
 
                   <td className="p-3 font-semibold text-gray-900 whitespace-nowrap">
-                    {employee.firstName} {employee.lastName}
-                  </td>
-                  {["username", "department"].map((field) => (
-                    <td
-                      key={field}
-                      className="p-3 text-gray-600 truncate max-w-[150px]"
-                      title={employee[field as keyof Employee]?.toString()}
-                    >
-                      {/* {field === "salary"
-                        ? `$${employee.salary?.toLocaleString() || "N/A"}`
-                        : field === "hireDate"
-                        ? new Date(employee.hireDate!).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' }) :*/}
-                      {field === "department"
-                        ? employee.department?.name
-                        : employee[field as keyof Employee]?.toString()}
-                    </td>
-                  ))}
-                  {/* {[
-                    "morningCheckInTime",
-                    "morningCheckOutTime",
-                    "afternoonCheckInTime",
-                    "afternoonCheckOutTime",
-                  ].map((field,i) => (
-                    <td
-                      key={field}
-                      className="p-3 text-gray-600 truncate max-w-[150px]"
-                    >
-                      {employee.attendances &&
-                      employee.attendances[0] &&
-                      employee.attendances[0][
-                        field as keyof (typeof employee.attendances)[0]
-                      ]
-                        ? (new Date(
-                            employee.attendances[0][
-                              field as keyof AttendanceTime
-                            ]!
-                          ).toLocaleTimeString("en-US", {
-                            hour: "2-digit",
-                            minute: "2-digit",
-                            hour12: false, // 24-hour format
-                            timeZone: "UTC", // Critical to ignore local timezone
-                          }) && (i == 0 &&employee.attendances[0]?.isLateMorningCheckIn ? " (Late)" : i==1 && employee.attendances[0]?.isEarlyMorningCheckOut ? " (Early)" : i==2 && employee.attendances[0]?.isLateAfternoonCheckIn ? " (Late)" : i==3 && employee.attendances[0]?.isEarlyAfternoonCheckOut ? " (Early)" : "(On Time)")
-                        
-                        )
-                        : field.endsWith("CheckOutTime") &&
-                          !employee.attendances[0]?.checkOutEnabled
-                        ? "N/A"
-                        : "-"}
-                    </td>
-                  ))} */}
+                    {attendance.date.toDateString()}
+                  </td> 
+                  
                   {[
                     "morningCheckInTime",
                     "morningCheckOutTime",
@@ -410,14 +361,14 @@ const AttendanceTable: React.FC<AttendanceTableProps> = ({ departments }) => {
                       key={field}
                       className="p-3 text-gray-600 truncate max-w-[150px]"
                     >
-                      {employee.attendances &&
-                      employee.attendances[0] &&
-                      employee.attendances[0][
-                        field as keyof (typeof employee.attendances)[0]
+                      {attendance &&
+                      attendance &&
+                      attendance[
+                        field as keyof (typeof attendance)
                       ] ? (
                         <div className="flex items-center">
                           {new Date(
-                            employee.attendances[0][
+                            attendance[
                               field as keyof AttendanceTime
                             ]!
                           ).toLocaleTimeString("en-US", {
@@ -428,7 +379,7 @@ const AttendanceTable: React.FC<AttendanceTableProps> = ({ departments }) => {
                           })}
                           {/* Status Badge */}
                           {i == 0 &&
-                            (employee.attendances[0]?.isLateMorningCheckIn ? (
+                            (attendance?.isLateMorningCheckIn ? (
                               <span className="ml-2 px-2 py-0.5 text-xs font-medium bg-yellow-100 text-yellow-800 rounded-full">
                                 Late
                               </span>
@@ -438,7 +389,7 @@ const AttendanceTable: React.FC<AttendanceTableProps> = ({ departments }) => {
                               </span>
                             ))}
                           {i == 1 &&
-                            (employee.attendances[0]?.isEarlyMorningCheckOut ? (
+                            (attendance?.isEarlyMorningCheckOut ? (
                               <span className="ml-2 px-2 py-0.5 text-xs font-medium bg-red-100 text-red-800 rounded-full">
                                 Early
                               </span>
@@ -448,7 +399,7 @@ const AttendanceTable: React.FC<AttendanceTableProps> = ({ departments }) => {
                               </span>
                             ))}
                           {i == 2 &&
-                            (employee.attendances[0]?.isLateAfternoonCheckIn ? (
+                            (attendance?.isLateAfternoonCheckIn ? (
                               <span className="ml-2 px-2 py-0.5 text-xs font-medium bg-yellow-100 text-yellow-800 rounded-full">
                                 Late
                               </span>
@@ -458,7 +409,7 @@ const AttendanceTable: React.FC<AttendanceTableProps> = ({ departments }) => {
                               </span>
                             ))}
                           {i == 3 &&
-                            (employee.attendances[0]
+                            (attendance
                               ?.isEarlyAfternoonCheckOut ? (
                               <span className="ml-2 px-2 py-0.5 text-xs font-medium bg-red-100 text-red-800 rounded-full">
                                 Early
@@ -470,7 +421,7 @@ const AttendanceTable: React.FC<AttendanceTableProps> = ({ departments }) => {
                             ))}
                         </div>
                       ) : field.endsWith("CheckOutTime") &&
-                        !employee.attendances[0]?.checkOutEnabled ? (
+                        !attendance?.checkOutEnabled ? (
                         "N/A"
                       ) : (
                         "-"
@@ -479,35 +430,35 @@ const AttendanceTable: React.FC<AttendanceTableProps> = ({ departments }) => {
                   ))}
 
                   {/* <td className="p-3 text-gray-600 truncate max-w-[150px]">
-                    {employee.attendances[0]?.status
-                    ? employee.attendances[0].status.charAt(0).toUpperCase() +
-                    employee.attendances[0].status.slice(1).toLowerCase()
+                    {attendance?.status
+                    ? attendance.status.charAt(0).toUpperCase() +
+                    attendance.status.slice(1).toLowerCase()
                     : "Absent"}
 
                   </td> */}
                   <td className="p-3 text-gray-600 truncate max-w-[150px]">
-                    {employee.attendances[0]?.status ? (
+                    {attendance?.status ? (
                       <span
                         className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
-                          employee.attendances[0].status.toLowerCase() ===
+                          attendance.status.toLowerCase() ===
                           "present"
                             ? "bg-green-100 text-green-800"
-                            : employee.attendances[0].status.toLowerCase() ===
+                            : attendance.status.toLowerCase() ===
                               "absent"
                             ? "bg-red-100 text-red-800"
-                            : employee.attendances[0].status.toLowerCase() ===
+                            : attendance.status.toLowerCase() ===
                               "late"
                             ? "bg-yellow-100 text-yellow-800"
-                            : employee.attendances[0].status.toLowerCase() ===
+                            : attendance.status.toLowerCase() ===
                               "on_leave"
                             ? "bg-blue-100 text-blue-800"
                             : "bg-gray-100 text-gray-800" // Default for unknown status
                         }`}
                       >
-                        {employee.attendances[0].status
+                        {attendance.status
                           .charAt(0)
                           .toUpperCase() +
-                          employee.attendances[0].status.slice(1).toLowerCase()}
+                          attendance.status.slice(1).toLowerCase()}
                       </span>
                     ) : (
                       <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-red-100 text-red-800">
@@ -518,7 +469,7 @@ const AttendanceTable: React.FC<AttendanceTableProps> = ({ departments }) => {
 
                   <td className="p-3 text-center flex">
                     <Link
-                      href={`/admin/attendance/${employee.id}`}
+                      href={`./employees/${""}`}
                       className="text-blue-600 hover:text-blue-800 mx-1"
                     >
                       <FaEye size={18} />
@@ -528,8 +479,8 @@ const AttendanceTable: React.FC<AttendanceTableProps> = ({ departments }) => {
                       className="text-green-600 hover:text-green-800 mx-1"
                       onClick={(e) =>
                         openAttendanceEditModal(
-                          employee.attendances,
-                          employee.id
+                          [attendance],
+                          Number(empId)
                         )
                       }
                     >
@@ -544,7 +495,7 @@ const AttendanceTable: React.FC<AttendanceTableProps> = ({ departments }) => {
             ) : (
               <tr>
                 <td colSpan={10} className="p-5 text-center text-gray-500">
-                  No employees found.
+                  No attendances found.
                 </td>
               </tr>
             )}
@@ -594,4 +545,4 @@ const AttendanceTable: React.FC<AttendanceTableProps> = ({ departments }) => {
   );
 };
 
-export default AttendanceTable;
+export default AttendanceDetailTable;
