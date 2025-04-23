@@ -1,6 +1,6 @@
 "use client"
 import React, { useState } from "react";
-import { FaHome, FaUsers, FaBuilding, FaCog, FaSignOutAlt, FaBars, FaChevronDown } from "react-icons/fa";
+import { FaHome, FaUsers, FaBuilding, FaCog, FaSignOutAlt, FaBars, FaChevronDown, FaCalendarCheck, FaCalendarTimes, FaSitemap, FaUserPlus, FaAddressBook } from "react-icons/fa";
 import { useRouter, usePathname } from "next/navigation";
 import Image from "next/image";
 
@@ -22,10 +22,11 @@ const AdminSidebar = () => {
   ];
 
   const employeesMenu = [
-    { name: "Employees", icon: <FaUsers />, path: "/admin/employees" },
-    { name: "Register Employee", icon: <FaUsers />, path: "/admin/employees/new" },
-    { name: "Departments", icon: <FaBuilding />, path: "/admin/departments" },
-    { name: "Attendance", icon: <FaBuilding />, path: "/admin/attendance" },
+    { name: "Employees", icon: <FaAddressBook />, path: "/admin/employees" },
+    { name: "Register Employee", icon: <FaUserPlus />, path: "/admin/employees/new" },
+    { name: "Departments", icon: <FaSitemap />, path: "/admin/departments" },
+    { name: "Attendance", icon: <FaCalendarCheck />, path: "/admin/attendance" },
+    { name: "Leave", icon: <FaCalendarTimes />, path: "/admin/leave" },
   ];
 
   const settingsMenu = [
@@ -75,7 +76,7 @@ const AdminSidebar = () => {
             onClick={() => router.push(item.path)}
           >
             <span className="text-lg">{item.icon}</span>
-            {!isCollapsed && <span className="ml-3">{item.name}</span>}
+            {!isCollapsed && <span className="ml-3 ">{item.name}</span>}
           </div>
         ))}
 

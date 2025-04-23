@@ -1,1 +1,0 @@
-const test = {check_in: {morning: "8:15",afternoon: "13:15", treshold: 15},check_out: {morning: "12:30",afternoon: "17:30", treshold: 15},}

@@ -1,0 +1,43 @@
+Menu Item: Employees
+
+Current Icon: <FaUsers /> (Multiple users)
+Suitable Alternatives:
+<FaUserFriends />: This icon is very similar to FaUsers but might be slightly more visually distinct. It still represents a group of people.
+<FaUserTie />: This icon represents a single user in a professional context, which could be suitable for an employee management section.
+<FaIdCard />: This icon represents an ID card, which is often associated with employees.
+<FaAddressBook />: This icon represents a list of contacts, which could be interpreted as a list of employees.
+Menu Item: Register Employee
+
+Current Icon: <FaUsers /> (Multiple users)
+Suitable Alternatives:
+<FaUserPlus />: This is the most direct and commonly used icon for adding a new user or employee.
+<FaUserEdit />: This icon could represent creating or editing a user profile.
+<FaFileSignature />: This icon represents signing a document, which could be associated with the hiring process.
+<FaClipboardList />: This icon represents a list on a clipboard, which could be associated with a new employee form.
+Menu Item: Departments
+
+Current Icon: <FaBuilding /> (Building)
+Suitable Alternatives:
+<FaSitemap />: This icon represents an organizational chart, which is a good visual metaphor for departments.
+<FaLayerGroup />: This icon represents layers, which can be interpreted as different levels or divisions within a company.
+<FaObjectGroup />: This icon represents a group of objects, which could be interpreted as a group of departments.
+<FaCity />: This icon represents a city, which could be interpreted as a collection of departments.
+Menu Item: Attendance
+
+Current Icon: <FaBuilding /> (Building)
+Suitable Alternatives:
+<FaCalendarCheck />: This icon directly represents a calendar with a checkmark, which is perfect for attendance tracking.
+<FaClock />: This icon represents a clock, which is associated with time and attendance.
+<FaClipboardCheck />: This icon represents a clipboard with a checkmark, which could be interpreted as a list of attendance records.
+<FaUserClock />: This icon represents a user with a clock, which could be interpreted as employee attendance.
+Menu Item: Leave
+
+Current Icon: <FaBuilding /> (Building)
+Suitable Alternatives:
+<FaCalendarTimes />: This icon represents a calendar with a cross, which is a good visual for leave or time off.
+<FaPlaneDeparture />: This icon represents a plane taking off, which is associated with travel and time off.
+<FaUmbrellaBeach />: This icon represents a beach umbrella, which is associated with vacation and leave.
+<FaSuitcaseRolling />: This icon represents a suitcase, which is associated with travel and time off.
+Summary Table
+
+| Menu Item | Current Icon | Suggested Alternatives

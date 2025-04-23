@@ -494,136 +494,53 @@ export async function getEmployeesAttendance(
       type: true,
     },
   });
-  if (true) {
-    const employees = await prisma.user.findMany({
-      skip: (page - 1) * employeesPerPage,
-      take: employeesPerPage,
-      //_count
-      select: {
-        id: true,
-        firstName: true,
-        lastName: true,
-        username: true,
-        photograph: true,
-        department: {
-          select: {
-            name: true,
-          },
-        },
-        attendances: {
-          where: {
-            date: {
-              lte: (await formatDate(date)).endOfDay,
-              gte: (await formatDate(date)).startOfDay,
-            },
-          },
-          select: {
-            id: true,
-            morningCheckInTime: true,
-            morningCheckOutTime: true,
-            afternoonCheckInTime: true,
-            afternoonCheckOutTime: true,
 
-            isLateMorningCheckIn: true,
-            isLateAfternoonCheckIn: true,
-            isEarlyMorningCheckOut: true,
-            isEarlyAfternoonCheckOut: true,
-            checkOutEnabled: true,
-            status: true,
-            date: true,
-          },
+  const employees = await prisma.user.findMany({
+    skip: (page - 1) * employeesPerPage,
+    take: employeesPerPage,
+    //_count
+    select: {
+      id: true,
+      firstName: true,
+      lastName: true,
+      username: true,
+      photograph: true,
+      department: {
+        select: {
+          name: true,
         },
       },
-    });
-    const total = await prisma.user.count();
-    (employees as any).total = total;
+      attendances: {
+        where: {
+          date: {
+            lte: (await formatDate(date)).endOfDay,
+            gte: (await formatDate(date)).startOfDay,
+          },
+        },
+        select: {
+          id: true,
+          morningCheckInTime: true,
+          morningCheckOutTime: true,
+          afternoonCheckInTime: true,
+          afternoonCheckOutTime: true,
 
-    console.log(employees[0].username, employees[0].attendances);
-    console.log("date: ", date);
-    return { employees, total, settings };
-  }
+          isLateMorningCheckIn: true,
+          isLateAfternoonCheckIn: true,
+          isEarlyMorningCheckOut: true,
+          isEarlyAfternoonCheckOut: true,
+          checkOutEnabled: true,
+          status: true,
+          date: true,
+        },
+      },
+    },
+  });
+  const total = await prisma.user.count();
+  (employees as any).total = total;
 
-  // const filter = () => {
-  //   if (searchBy == "phone") return "phoneNumber";
-  //   if (searchBy == "jobtitle") return "jobTitle";
-
-  //   return searchBy;
-  // };
-
-  // const filterValue = filter();
-
-  // const whereClause: any = (() => {
-  //   switch (filterValue) {
-  //     case "name":
-  //       return {
-  //         OR: [
-  //           { firstName: { contains: query, mode: "insensitive" as any } },
-  //           { lastName: { contains: query, mode: "insensitive" as any } },
-  //         ],
-  //       };
-  //     case "department":
-  //       return {
-  //         department: {
-  //           name: { contains: query, mode: "insensitive" as any },
-  //         },
-  //       };
-  //     case "role":
-  //       return {
-  //         role: query[0].toUpperCase() + query.slice(1),
-  //       };
-  //     case "hireDate":
-  //       return {
-  //         hireDate: {
-  //           gte: new Date(query.split(":")[0]),
-  //           lte:
-  //             (query.split(":")[1] && new Date(query.split(":")[1])) ||
-  //             new Date(),
-  //         },
-  //       };
-  //     default:
-  //       return {
-  //         [filterValue]: { contains: query, mode: "insensitive" as any },
-  //       };
-  //   }
-  // })();
-
-  // const employees = await prisma.user.findMany({
-  //   skip: (page - 1) * employeesPerPage,
-  //   take: employeesPerPage,
-  //   where: whereClause,
-  //   select: {
-  //     ...{
-  //       department: {
-  //         select: {
-  //           name: true,
-  //         },
-  //       },
-  //       attendances: {
-  //         select: {
-  //           id: true,
-  //           morningCheckInTime: true,
-  //           morningCheckOutTime: checkOutEnabled,
-  //           afternoonCheckInTime: true,
-  //           afternoonCheckOutTime: checkOutEnabled,
-  //       }
-  //     }
-  //     },
-  //     id: true,
-  //     firstName: true,
-  //     lastName: true,
-  //     username: true,
-  //     // phoneNumber: true,
-  //     // jobTitle: true,
-  //     // role: true,
-  //     // salary: true,
-  //     // hireDate: true,
-  //     photograph: true,
-  //   },
-  // });
-  // const total = await prisma.user.count({ where: whereClause });
-  // (employees as any).total = total;
-
-  // return { employees, total };
+  console.log(employees[0].username, employees[0].attendances);
+  console.log("date: ", date);
+  return { employees, total, settings };
 }
 
 //get all the attendances of an employee with id
@@ -633,14 +550,11 @@ export async function getAllAttendance(
   query = "",
   searchBy: string,
   attendancesPerPage = 10,
-  page = 1,
+  page = 1
 ) {
   const filterValue = searchBy;
 
-  const getWhereClause = async (
-    filterValue: string,
-    query: string,
-  ) => {
+  const getWhereClause = async (filterValue: string, query: string) => {
     if (!filterValue || !query) {
       return {}; // Return an empty object if no filter is needed
     }
@@ -651,15 +565,15 @@ export async function getAllAttendance(
       case "afternoonCheckInTime":
       case "afternoonCheckOutTime":
         return {};
-      case "date":        
-          return {
-            date: {
-              gte: new Date(query.split(":")[0]),
-              lte:
-                (query.split(":")[1] && new Date(query.split(":")[1])) ||
-                new Date(),
-            },
-          };
+      case "date":
+        return {
+          date: {
+            gte: new Date(query.split(":")[0]),
+            lte:
+              (query.split(":")[1] && new Date(query.split(":")[1])) ||
+              new Date(),
+          },
+        };
       case "status":
         return {
           status: query.toUpperCase(),
@@ -790,8 +704,50 @@ export async function getAllAttendance(
         };
     }
   }
-  
+
   return { employee, total, settings };
+}
+
+export async function getLeaveRequests(empId?: number) {
+  const leaveRequests = await prisma.leaveRequest.findMany({
+    where: empId ? {
+      userId: empId,
+    } : undefined,
+    select: {
+      id: true,
+      startDate: true,
+      endDate: true,
+      reason: true,
+      status: true,
+      createdAt: true,
+      leaveType: {
+        select: {
+          name: true,
+        },
+      },
+      user: {
+        select: {
+          id: true,
+          firstName: true,
+          lastName: true,
+          username: true,
+          photograph: true,
+          department: {
+            select: {
+              name: true,
+            },
+          },
+        },
+      },
+    },
+  });
+  const leaveTypes = await prisma.leaveType.findMany({
+    select: {
+      id: true,
+      name: true,
+    },
+  });
+  return { leaveRequests, leaveTypes };
 }
 
 async function getEmployeeAttendance(empId: number, date: Date) {
