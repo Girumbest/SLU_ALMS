@@ -626,6 +626,7 @@ export async function getEmployeesAttendance(
   // return { employees, total };
 }
 
+//get all the attendances of an employee with id
 export async function getAllAttendance(
   empId: number,
 
@@ -633,59 +634,45 @@ export async function getAllAttendance(
   searchBy: string,
   attendancesPerPage = 10,
   page = 1,
-  date?: Date
 ) {
-
   const filterValue = searchBy;
 
   const getWhereClause = async (
     filterValue: string,
     query: string,
-    date?: Date
   ) => {
-    if (!filterValue) {
+    if (!filterValue || !query) {
       return {}; // Return an empty object if no filter is needed
     }
-  
+
     switch (filterValue) {
       case "morningCheckInTime":
       case "morningCheckOutTime":
       case "afternoonCheckInTime":
       case "afternoonCheckOutTime":
-        let [hours, minutes] = query.split(":").map(Number);
-        minutes = minutes || 0;
-  
-        // Create date objects for comparison (using arbitrary date)
-        const startDate = new Date(2020, 0, 1, hours, minutes, 0);
-        const endDate = new Date(2020, 0, 1, hours, minutes, 59);
-        return {
-          [filterValue]: {
-            gte: startDate,
-            lte: endDate,
-          },
-        };
-      case "date":
-        if (date) {
-          const { startOfDay, endOfDay } = await formatDate(date);
-          console.log("DATE CHECK",startOfDay,", ", endOfDay);
+        return {};
+      case "date":        
           return {
             date: {
-              gte: startOfDay,
-              lte: endOfDay,
+              gte: new Date(query.split(":")[0]),
+              lte:
+                (query.split(":")[1] && new Date(query.split(":")[1])) ||
+                new Date(),
             },
           };
-        }
-        return {}; // Return empty object if date is not provided
+      case "status":
+        return {
+          status: query.toUpperCase(),
+        };
       default:
         return {
           [filterValue]: { contains: query, mode: "insensitive" as any },
         };
     }
   };
-  
-  console.log(date)
-  const whereClause = await getWhereClause(filterValue, query, date);
-  console.log("WHERE CLAUSE:", whereClause)
+
+  const whereClause = await getWhereClause(filterValue, query);
+  console.log("WHERE CLAUSE:", whereClause);
 
   const settings = await prisma.settings.findMany({
     where: {
@@ -738,51 +725,73 @@ export async function getAllAttendance(
       },
     },
   });
+
   const total = await prisma.attendance.count({ where: { userId: empId } });
   (employee as any).total = total;
 
-  // console.log("attendances: ", employee?.attendances);
+  //filter and return attendances by time
+  function filterEmployeeAttendancesByTime(
+    employee: any,
+    query: string,
+    filterKey: string
+  ) {
+    // Check if the query is in "HH" or "HH:MM" format
+    const isHourOnly = !query.includes(":");
+
+    // Parse the query
+    const [queryHours, queryMinutes = "00"] = query.split(":");
+    const queryHour = parseInt(queryHours);
+
+    // Filter the attendances
+    const filteredAttendances = employee.attendances.filter((attendance) => {
+      const checkTime = attendance[filterKey];
+      if (!checkTime) return false; // Skip if no time is recorded
+
+      const checkDate = new Date(checkTime);
+      const checkHour = checkDate.getHours();
+
+      // If query is "HH" (hour-only), match only the hour
+      if (isHourOnly) {
+        return checkHour === queryHour;
+      }
+      // If query is "HH:MM", match both hour and minute
+      else {
+        const checkMinutes = checkDate.getMinutes();
+        return (
+          checkHour === queryHour && checkMinutes === parseInt(queryMinutes)
+        );
+      }
+    });
+
+    // Return a new employee object with filtered attendances
+    return {
+      ...employee,
+      attendances: filteredAttendances,
+      total: filteredAttendances.length,
+    };
+  }
+
+  if (filterValue && query) {
+    switch (filterValue) {
+      case "morningCheckInTime":
+      case "morningCheckOutTime":
+      case "afternoonCheckInTime":
+      case "afternoonCheckOutTime":
+        const filteredEmployee = filterEmployeeAttendancesByTime(
+          employee,
+          query,
+          filterValue
+        );
+
+        return {
+          employee: filteredEmployee,
+          total: filteredEmployee.attendances.length,
+          settings,
+        };
+    }
+  }
+  
   return { employee, total, settings };
-
- 
-
-  // const employees = await prisma.user.findMany({
-  //   skip: (page - 1) * employeesPerPage,
-  //   take: employeesPerPage,
-  //   where: whereClause,
-  //   select: {
-  //     ...{
-  //       department: {
-  //         select: {
-  //           name: true,
-  //         },
-  //       },
-  //       attendances: {
-  //         select: {
-  //           id: true,
-  //           morningCheckInTime: true,
-  //           morningCheckOutTime: checkOutEnabled,
-  //           afternoonCheckInTime: true,
-  //           afternoonCheckOutTime: checkOutEnabled,
-  //       }
-  //     }
-  //     },
-  //     id: true,
-  //     firstName: true,
-  //     lastName: true,
-  //     username: true,
-  //     // phoneNumber: true,
-  //     // jobTitle: true,
-  //     // role: true,
-  //     // salary: true,
-  //     // hireDate: true,
-  //     photograph: true,
-  //   },
-  // });
-  // const total = await prisma.user.count({ where: whereClause });
-  // (employees as any).total = total;
-
-  // return { employees, total };
 }
 
 async function getEmployeeAttendance(empId: number, date: Date) {
@@ -1087,7 +1096,6 @@ const formatDate = async (date: Date) => {
   endOfDay.setUTCHours(23, 59, 59, 999); // Set to the end of the day in UTC
   return { startOfDay, endOfDay };
 };
-
 
 // const formatDate = async (date: Date) => {
 //   const startOfDay = new Date(date);

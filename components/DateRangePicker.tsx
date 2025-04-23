@@ -3,9 +3,10 @@ import { FaChevronDown, FaCross, FaTimesCircle } from "react-icons/fa";
 
 interface DateRangePickerProps {
   onDateRangeChange: (startDate: string, endDate: string) => void;
+  style?: string;
 }
 
-const DateRangePicker: React.FC<DateRangePickerProps> = ({ onDateRangeChange }) => {
+const DateRangePicker: React.FC<DateRangePickerProps> = ({ onDateRangeChange, style }) => {
   const [startDate, setStartDate] = useState<string>('');
   const [endDate, setEndDate] = useState<string>('');
   const [isPickerVisible, setIsPickerVisible] = useState<boolean>(false);
@@ -48,7 +49,7 @@ const DateRangePicker: React.FC<DateRangePickerProps> = ({ onDateRangeChange }) 
         />}
       </div>
       {isPickerVisible && (
-        <div className="absolute z-10 mt-2 w-65 right-0 rounded-md bg-white shadow-lg">
+        <div className={`absolute z-10 mt-2 w-65 right-0 rounded-md bg-white shadow-lg ${style}`}>
           <div className="p-4">
             <div className="flex justify-between">
               <input

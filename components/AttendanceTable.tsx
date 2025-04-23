@@ -74,7 +74,7 @@ const AttendanceTable: React.FC<AttendanceTableProps> = ({ departments }) => {
   const [employeesAttendance, setEmployeesAttendance] = useState<Employee[]>(
     []
   );
-  const roles = ["Employee", "Supervisor"];
+  const status = ["Absent", "Present", "On_Leave"];
 
   useEffect(() => {
     setFilters({ filterKey: "", searchValue: "" });
@@ -89,7 +89,7 @@ const AttendanceTable: React.FC<AttendanceTableProps> = ({ departments }) => {
         date
       );
       setFilteredEmployees(data.employees);
-      // setEmployeesAttendance(data.employees);
+      setEmployeesAttendance(data.employees);
       setSettings(data.settings);
       setTotalPages(data.total);
       console.log(data);
@@ -134,7 +134,6 @@ const AttendanceTable: React.FC<AttendanceTableProps> = ({ departments }) => {
       );
     }
     if (column == "m-check-in") {
-      // alert(value)
       setFilteredEmployees(
         employeesAttendance.filter((employee) => {
           return new Date(employee.attendances[0]?.morningCheckInTime!)
@@ -142,11 +141,13 @@ const AttendanceTable: React.FC<AttendanceTableProps> = ({ departments }) => {
               hour: "2-digit",
               minute: "2-digit",
               hour12: false,
+              timeZone: "UTC",
             })
             .includes(value);
         })
       );
     }
+
     if (column == "m-check-out") {
       // alert(value)
       setFilteredEmployees(
@@ -156,6 +157,7 @@ const AttendanceTable: React.FC<AttendanceTableProps> = ({ departments }) => {
               hour: "2-digit",
               minute: "2-digit",
               hour12: false,
+              timeZone: "UTC",
             })
             .includes(value);
         })
@@ -171,6 +173,7 @@ const AttendanceTable: React.FC<AttendanceTableProps> = ({ departments }) => {
               hour: "2-digit",
               minute: "2-digit",
               hour12: false,
+              timeZone: "UTC",
             })
             .includes(value);
         })
@@ -186,11 +189,35 @@ const AttendanceTable: React.FC<AttendanceTableProps> = ({ departments }) => {
               hour: "2-digit",
               minute: "2-digit",
               hour12: false,
+              timeZone: "UTC",
             })
             .includes(value);
         })
       );
     }
+    if (column == "status") {
+      if(!value){
+        setFilteredEmployees(employeesAttendance); 
+        return
+      }
+      
+      if(value == "Absent"){
+        setFilteredEmployees(
+          employeesAttendance.filter((employee) =>{
+            return (employee.attendances[0]?.status.toLowerCase().includes(value.toLowerCase()) || !(employee.attendances[0]?.status))
+          }
+          )
+        );
+      }
+      else{
+      setFilteredEmployees(
+        employeesAttendance.filter((employee) =>
+          employee.attendances[0]?.status.toLowerCase().includes(value.toLowerCase())
+        )
+      );
+    }
+    }
+
   };
 
   const totalPages = Math.ceil(totalResults / employeesPerPage);
@@ -251,7 +278,7 @@ const AttendanceTable: React.FC<AttendanceTableProps> = ({ departments }) => {
                   {![
                     "Photo",
                     "Department",
-                    "Role",
+                    "Status",
                     "Hire Date",
                     "Actions",
                   ].includes(header) && (
@@ -298,19 +325,19 @@ const AttendanceTable: React.FC<AttendanceTableProps> = ({ departments }) => {
                     </select>
                   )}
 
-                  {header === "Role" && (
+                  {header === "Status" && (
                     <select
                       onChange={(e) =>
-                        handleFilterChange("role", e.target.value)
+                        handleFilterChange("status", e.target.value)
                       }
                       className="w-full p-2 bg-white border border-gray-300 rounded focus:outline-none"
                     >
-                      <option value="" selected={filters.filterKey != "role"}>
+                      <option value="" selected={filters.filterKey != "status"}>
                         All
                       </option>
-                      {roles.map((role) => (
-                        <option key={role} value={role}>
-                          {role}
+                      {status.map((status) => (
+                        <option key={status} value={status}>
+                          {status}
                         </option>
                       ))}
                     </select>
@@ -367,39 +394,7 @@ const AttendanceTable: React.FC<AttendanceTableProps> = ({ departments }) => {
                         : employee[field as keyof Employee]?.toString()}
                     </td>
                   ))}
-                  {/* {[
-                    "morningCheckInTime",
-                    "morningCheckOutTime",
-                    "afternoonCheckInTime",
-                    "afternoonCheckOutTime",
-                  ].map((field,i) => (
-                    <td
-                      key={field}
-                      className="p-3 text-gray-600 truncate max-w-[150px]"
-                    >
-                      {employee.attendances &&
-                      employee.attendances[0] &&
-                      employee.attendances[0][
-                        field as keyof (typeof employee.attendances)[0]
-                      ]
-                        ? (new Date(
-                            employee.attendances[0][
-                              field as keyof AttendanceTime
-                            ]!
-                          ).toLocaleTimeString("en-US", {
-                            hour: "2-digit",
-                            minute: "2-digit",
-                            hour12: false, // 24-hour format
-                            timeZone: "UTC", // Critical to ignore local timezone
-                          }) && (i == 0 &&employee.attendances[0]?.isLateMorningCheckIn ? " (Late)" : i==1 && employee.attendances[0]?.isEarlyMorningCheckOut ? " (Early)" : i==2 && employee.attendances[0]?.isLateAfternoonCheckIn ? " (Late)" : i==3 && employee.attendances[0]?.isEarlyAfternoonCheckOut ? " (Early)" : "(On Time)")
-                        
-                        )
-                        : field.endsWith("CheckOutTime") &&
-                          !employee.attendances[0]?.checkOutEnabled
-                        ? "N/A"
-                        : "-"}
-                    </td>
-                  ))} */}
+                  
                   {[
                     "morningCheckInTime",
                     "morningCheckOutTime",

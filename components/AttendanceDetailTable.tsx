@@ -57,12 +57,13 @@ const AttendanceDetailTable: React.FC<AttendanceTableProps> = ({ departments, em
     setIsAttendanceModalOpen(true);
   };
 
-  const [date, setDate] = useState<Date>(new Date());
+  const [date, setDate] = useState<Date>();
   const [rerender, setRerender] = useState(false);
 
   const [currentPage, setCurrentPage] = useState(1);
   const attendancesPerPage = 5;
 
+  const [searchKey, setSearchKey] = useState<string>('') // used to reset filter search input
   const [filters, setFilters] = useState<{
     filterKey: string;
     searchValue: string;
@@ -76,8 +77,9 @@ const AttendanceDetailTable: React.FC<AttendanceTableProps> = ({ departments, em
   const [employeesAttendance, setEmployeesAttendance] = useState<Attendance[]>(
     []
   );
-  const roles = ["Employee", "Supervisor"];
-
+  const status = ["Absent", "Present", "On_Leave"];
+  const [employeeName, setEmployeeName] = useState<string>();
+  
   useEffect(() => {
     // setFilters({ filterKey: "", searchValue: "" });
     setCurrentPage(1);
@@ -88,9 +90,10 @@ const AttendanceDetailTable: React.FC<AttendanceTableProps> = ({ departments, em
         filters.filterKey,
         attendancesPerPage,
         currentPage,
-        date
+        // date
       );
       setFilteredAttendances(data.employee?.attendances);
+      setEmployeeName(data.employee?.firstName + " " + data.employee?.lastName)
       // setEmployeesAttendance(data.employees);
       setSettings(data.settings);
       setTotalPages(data.total);
@@ -103,14 +106,17 @@ const AttendanceDetailTable: React.FC<AttendanceTableProps> = ({ departments, em
     if (!startDate && !endDate) {
       setFilters({ filterKey: "", searchValue: "" });
     } else {
+      // setDate(`${startDate}:${endDate}`)
       setFilters({
-        filterKey: "hireDate",
+        filterKey: "date",
         searchValue: `${startDate}:${endDate}`,
       });
     }
   };
 
   const handleFilterChange = (column: string, value: string) => {
+    console.log(searchKey)
+    setSearchKey(column);
     setFilters({ filterKey: column, searchValue: value });
     // if (column == "name") {
     //   setFilteredAttendances(
@@ -136,64 +142,20 @@ const AttendanceDetailTable: React.FC<AttendanceTableProps> = ({ departments, em
     //   );
     // }
     if (column == "m-check-in") {
-      console.log("Check-in", value)
       setFilters({ filterKey: "morningCheckInTime", searchValue: value});
-
-      // setFilteredAttendances(
-      //   employeesAttendance.filter((attendance) => {
-      //     return new Date(attendance.morningCheckInTime!)
-      //       .toLocaleTimeString("en-US", {
-      //         hour: "2-digit",
-      //         minute: "2-digit",
-      //         hour12: false,
-      //       })
-      //       .includes(value);
-      //   })
-      // );
     }
     if (column == "m-check-out") {
-      // alert(value)
-      setFilteredAttendances(
-        employeesAttendance.filter((attendance) => {
-          return new Date(attendance?.morningCheckOutTime!)
-            .toLocaleTimeString("en-US", {
-              hour: "2-digit",
-              minute: "2-digit",
-              hour12: false,
-            })
-            .includes(value);
-        })
-      );
+      setFilters({ filterKey: "morningCheckOutTime", searchValue: value});
+
     }
 
     if (column == "a-check-in") {
-      // alert(value)
-      setFilteredAttendances(
-        employeesAttendance.filter((attendance) => {
-          return new Date(attendance?.afternoonCheckInTime!)
-            .toLocaleTimeString("en-US", {
-              hour: "2-digit",
-              minute: "2-digit",
-              hour12: false,
-            })
-            .includes(value);
-        })
-      );
+      setFilters({ filterKey: "afternoonCheckInTime", searchValue: value});
+
     }
 
     if (column == "a-check-out") {
-      // alert(value)
-      setFilteredAttendances(
-        employeesAttendance.filter((attendance) => {
-          return new Date(attendance?.afternoonCheckOutTime!)
-            .toLocaleTimeString("en-US", {
-              hour: "2-digit",
-              minute: "2-digit",
-              hour12: false,
-            })
-            .includes(value);
-        })
-      );
+      setFilters({ filterKey: "afternoonCheckOutTime", searchValue: value});
     }
   };
 
@@ -203,17 +165,18 @@ const AttendanceDetailTable: React.FC<AttendanceTableProps> = ({ departments, em
   return (
     <div className="max-w-7xl mx-auto bg-white shadow-lg rounded-lg p-6">
       <h2 className="text-2xl font-bold text-gray-800 mb-4 flex items-center">
-        <span className="mr-3 text-gray-700">Employee Attendances for</span>
-        <input
+        
+        <span className="mr-3 text-gray-700">{`Attendances of Employee: ${employeeName}`}</span>
+        {/* <input
           className="border border-gray-300 rounded-md p-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent w-40"
           type="date"
           max={new Date().toISOString().split("T")[0]}
-          defaultValue={date.toISOString().split("T")[0]}
+          defaultValue={date?.toISOString().split("T")[0]}
           onChange={(e) => setDate(new Date(e.target.value))}
         />
         <span className="ml-3 text-gray-600">
-          {date.toLocaleDateString("en-US", { weekday: "long" })}
-        </span>
+          {date?.toLocaleDateString("en-US", { weekday: "long" })}
+        </span> */}
       </h2>
 
       <div className="overflow-x-auto">
@@ -249,9 +212,10 @@ const AttendanceDetailTable: React.FC<AttendanceTableProps> = ({ departments, em
                   {![
                     "Photo",
                     "Department",
-                    "Role",
-                    "Hire Date",
+                    "Status",
+                    "Date",
                     "Actions",
+
                   ].includes(header) && (
                     <div className="flex items-center">
                       <input
@@ -264,8 +228,8 @@ const AttendanceDetailTable: React.FC<AttendanceTableProps> = ({ departments, em
                             e.target.value
                           )
                         }
-                        defaultValue={
-                          filters.filterKey !==
+                        value={
+                          searchKey !==
                           header.toLowerCase().replace(" ", "")
                             ? ""
                             : filters.searchValue
@@ -296,28 +260,29 @@ const AttendanceDetailTable: React.FC<AttendanceTableProps> = ({ departments, em
                     </select>
                   )}
 
-                  {header === "Role" && (
+                  {header === "Status" && (
                     <select
                       onChange={(e) =>
-                        handleFilterChange("role", e.target.value)
+                        handleFilterChange("status", e.target.value)
                       }
                       className="w-full p-2 bg-white border border-gray-300 rounded focus:outline-none"
                     >
-                      <option value="" selected={filters.filterKey != "role"}>
+                      <option value="" selected={filters.filterKey != "status"}>
                         All
                       </option>
-                      {roles.map((role) => (
-                        <option key={role} value={role}>
-                          {role}
+                      {status.map((status) => (
+                        <option key={status} value={status}>
+                          {status}
                         </option>
                       ))}
                     </select>
                   )}
 
-                  {header === "Hire Date" && (
+                  {header === "Date" && (
                     <div className="relative">
                       <DateRangePicker
                         onDateRangeChange={handleDateRangeChange}
+                        style="-right-40"
                       />
                     </div>
                   )}
