@@ -710,9 +710,11 @@ export async function getAllAttendance(
 
 export async function getLeaveRequests(empId?: number) {
   const leaveRequests = await prisma.leaveRequest.findMany({
-    where: empId ? {
-      userId: empId,
-    } : undefined,
+    where: empId
+      ? {
+          userId: empId,
+        }
+      : undefined,
     select: {
       id: true,
       startDate: true,
@@ -748,6 +750,127 @@ export async function getLeaveRequests(empId?: number) {
     },
   });
   return { leaveRequests, leaveTypes };
+}
+
+export async function getLeaveTypes() {
+  const leaveTypes = await prisma.leaveType.findMany({
+    select: {
+      id: true,
+      name: true,
+      maxDays: true,
+      description: true,
+    },
+  });
+  return { leaveTypes };
+}
+export async function getLeaveBalance(empId: number, leaveTypeId: number) {
+  const leaveBalance = await prisma.leaveBalance.findFirst({
+    where: {
+      userId: empId,
+      leaveTypeId: leaveTypeId,
+    },
+    select: {
+      id: true,
+      balance: true,
+    },
+  });
+  return { leaveBalance };
+}
+
+export async function createLeaveRequest(
+  prevState: UserFormState,
+  formData: FormData
+): Promise<UserFormState> {
+  try {
+    const leaveTypeId = formData.get("leaveTypeId") as string;
+    const startDate = formData.get("startDate") as string;
+    const endDate = formData.get("endDate") as string;
+    const reason = formData.get("reason") as string;
+    const empId = formData.get("empId") as string;
+
+    // Validate the data (add more validation as needed)
+    if (!empId || !leaveTypeId || !startDate || !endDate || !reason) {
+      console.log(empId,leaveTypeId,"__",startDate,endDate,reason)
+      return {
+        errorMsg: "Please fill in all fields.",
+      };
+    }
+    const days = new Date(endDate).getDate() - new Date(startDate).getDate();
+    if (days < 1) return { errorMsg: "End date must be after start date." };
+    let leaveBalance = (await getLeaveBalance(
+      Number(empId),
+      Number(leaveTypeId)
+    )).leaveBalance;
+
+    const leaveType = await prisma.leaveType.findUnique({
+      where: {
+        id: Number(leaveTypeId),
+      },
+      select: {
+        maxDays: true,
+      },
+    });
+
+    if (!leaveBalance?.id) {
+      if (leaveType.maxDays < days) {
+        return {
+          errorMsg: "Insufficient leave balance.",
+        };
+      }
+      await prisma.leaveRequest.create({
+        data: {
+          userId: Number(empId),
+          leaveTypeId: Number(leaveTypeId),
+          startDate: new Date(startDate),
+          endDate: new Date(endDate),
+          reason: reason,
+          status: "PENDING",
+        },
+      });
+      await prisma.leaveBalance.create({
+        data: {
+          userId: Number(empId),
+          leaveTypeId: Number(leaveTypeId),
+          balance: leaveType.maxDays - days,
+        },
+      });
+    } else {
+      if (leaveType.maxDays < days) {
+        return {
+          errorMsg: "Insufficient leave balance.",
+        };
+      }
+      await prisma.leaveRequest.create({
+        data: {
+          userId: Number(empId),
+          leaveTypeId: Number(leaveTypeId),
+          startDate: new Date(startDate),
+          endDate: new Date(endDate),
+          reason: reason,
+          status: "PENDING",
+        },
+      });
+      await prisma.leaveBalance.update({
+        where: {
+          userId: Number(empId),
+          leaveTypeId: Number(leaveTypeId),
+        },
+        data: {
+          balance: leaveType.maxDays - days,
+        },
+      });
+    }
+
+    revalidatePath("/dashboard");
+    return {
+      successMsg: "Leave request submitted successfully!",
+    };
+  } catch (error) {
+    console.error("Error creating leave request:", error);
+    return {
+      errorMsg: "Failed to submit leave request.",
+    };
+  }
 }
 
 async function getEmployeeAttendance(empId: number, date: Date) {

@@ -52,6 +52,8 @@ const LeaveRequestTable: React.FC<EmployeeTableProps> = ({ departments }) => {
 
   const [totalResults, setTotalPages] = useState<number>(0);
   const [filteredLeaves, setFilteredLeaves] = useState<LeaveRequest[]>([]);
+  const [leaves, setLeaves] = useState<LeaveRequest[]>([]);
+
   const status = ["Pending", "Approved", "Rejected"];
   const [leaveTypes, setLeaveTypes] = useState<{ id: number; name: string }[]>([]);
 
@@ -59,6 +61,7 @@ const LeaveRequestTable: React.FC<EmployeeTableProps> = ({ departments }) => {
     const fetchData = async () => {
       const data = await getLeaveRequests();
       setFilteredLeaves(data.leaveRequests);
+      setLeaves(data.leaveRequests)
       setLeaveTypes(data.leaveTypes);
       console.log(data)
       
@@ -82,12 +85,62 @@ const LeaveRequestTable: React.FC<EmployeeTableProps> = ({ departments }) => {
     setFilters({ filterKey: column, searchValue: value });
     if (column == "name") {
       setFilteredLeaves(
-        filteredLeaves.filter(
+        leaves.filter(
           (leave) =>
             leave.user.firstName.toLowerCase().includes(value.toLowerCase())
           )
       );
     }
+    if (column == "username") {
+      setFilteredLeaves(
+        leaves.filter(
+          (leave) =>
+            leave.user.username.toLowerCase().includes(value.toLowerCase())
+          )
+      );
+    }
+    if (column == "department"){
+      setFilteredLeaves(
+        leaves.filter(
+          (leave) =>
+            leave.user.department.name.toLowerCase().includes(value.toLowerCase())
+          )
+      );
+    }
+    if (column == "leaveType"){
+      setFilteredLeaves(
+        leaves.filter(
+          (leave) =>
+            leave.leaveType.name.toLowerCase().includes(value.toLowerCase())
+          )
+      );
+    }
+    if (column == "startdate"){
+      setFilteredLeaves(
+        leaves.filter(
+          (leave) => {
+            return new Date(leave.startDate).toLocaleDateString('en-GB') == new Date(value).toLocaleDateString('en-GB')
+          }
+          )
+      );
+    }
+    if (column == "enddate"){
+      setFilteredLeaves(
+        leaves.filter((leave) => new Date(leave.endDate).toLocaleDateString('en-GB') == new Date(value).toLocaleDateString('en-GB')
+          )
+      );
+    }
+    if (column == "status"){
+      if(!value) return setFilteredLeaves(leaves)
+      setFilteredLeaves(
+        leaves.filter((leave) => leave.status.toLowerCase() == value.toLowerCase())
+      );
+    }
+   if(column == "days"){
+    setFilteredLeaves(
+      leaves.filter((leave) => (leave.endDate.getDate() - leave.startDate.getDate()) == Number(value))
+    ) 
+  }
 
   };
 
@@ -191,7 +244,7 @@ const LeaveRequestTable: React.FC<EmployeeTableProps> = ({ departments }) => {
                       }
                       className="w-full p-2 bg-white border border-gray-300 rounded focus:outline-none"
                     >
-                      <option value="" selected={filters.filterKey != "role"}>
+                      <option value="" selected={filters.filterKey != "leaveType"}>
                         All
                       </option>
                       {leaveTypes.map((type) => (
@@ -206,6 +259,12 @@ const LeaveRequestTable: React.FC<EmployeeTableProps> = ({ departments }) => {
                     <div className="flex items-center">
                     <input
                     type="date"
+                    value={
+                      filters.filterKey !==
+                      header.toLowerCase().replace(" ", "")
+                        ? ""
+                        : filters.searchValue
+                    }
                     placeholder={`Search ${header}`}
                     className="w-full p-2 text-gray-800 rounded bg-white border border-gray-300 focus:outline-none focus:ring focus:ring-blue-400"
                     onChange={(e) =>
@@ -282,8 +341,12 @@ const LeaveRequestTable: React.FC<EmployeeTableProps> = ({ departments }) => {
                     >
                       {field === "startDate" || field === "endDate"
                         ? new Date(leave[field as keyof LeaveRequest]!).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' })
+                        : field === "leaveType"
+                        ? leave.leaveType.name
                         : field === "department"
                         ? leave.user.department?.name
+                        : field === "username"
+                        ? leave.user.username
                         : leave[field as keyof LeaveRequest]?.toString()}
                         {field === "days" && (leave.endDate.getDate() - leave.startDate.getDate())}
 
