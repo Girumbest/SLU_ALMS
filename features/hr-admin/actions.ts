@@ -5,7 +5,7 @@ import path from "path";
 
 import { prisma } from "@/lib/db";
 import { departmentSchema, employeeEditSchema, employeeSchema } from "./schema";
-import { UserFormState } from "./types";
+import { UserFormState, Event } from "./types";
 import { writeFile } from "fs/promises";
 import { generateUniqueFileName } from "@/utils/generate";
 import { revalidatePath } from "next/cache";
@@ -790,17 +790,16 @@ export async function createLeaveRequest(
 
     // Validate the data (add more validation as needed)
     if (!empId || !leaveTypeId || !startDate || !endDate || !reason) {
-      console.log(empId,leaveTypeId,"__",startDate,endDate,reason)
+      console.log(empId, leaveTypeId, "__", startDate, endDate, reason);
       return {
         errorMsg: "Please fill in all fields.",
       };
     }
     const days = new Date(endDate).getDate() - new Date(startDate).getDate();
     if (days < 1) return { errorMsg: "End date must be after start date." };
-    let leaveBalance = (await getLeaveBalance(
-      Number(empId),
-      Number(leaveTypeId)
-    )).leaveBalance;
+    let leaveBalance = (
+      await getLeaveBalance(Number(empId), Number(leaveTypeId))
+    ).leaveBalance;
 
     const leaveType = await prisma.leaveType.findUnique({
       where: {
@@ -1112,6 +1111,66 @@ export async function registerAttendance(
   revalidatePath(`/admin/attendance/${empId}`);
 
   return { successMsg: "Attendance registered successfully!" };
+}
+
+//Calendar
+export async function fetchEvents() {
+  try {
+    const events = await prisma.calendar.findMany();
+    console.log("EVENTS: ", events);
+    return { events };
+  } catch (error) {
+    console.error("Error fetching events:", error);
+    return { errorMsg: "Error fetching events" };
+  }
+}
+
+export async function saveEvent(eventData: Event, eventId?: number) {
+  try {
+    const { eventName, eventDate, isRecurring, eventType, description } =
+      eventData;
+    if (!eventId) {
+      const newEvent = await prisma.calendar.create({
+        data: {
+          eventName,
+          eventDate: new Date(eventDate),
+          isRecurring,
+          eventType,
+          description,
+        },
+      });
+      revalidatePath("/admin/calendar");
+      return { newEvent };
+    }
+    const updatedEvent = await prisma.calendar.update({
+      where: { id: eventId },
+      data: {
+        eventName,
+        eventDate: new Date(eventDate),
+        isRecurring,
+        eventType,
+        description,
+      },
+    });
+    revalidatePath("/admin/calendar");
+    return { updatedEvent };
+  } catch (error) {
+    console.error("Error saving event:", error);
+    return { errorMsg: "Error saving event" };
+  }
+}
+
+export async function deleteEvent(eventId: number) {
+  try {
+    await prisma.calendar.delete({
+      where: { id: eventId },
+    });
+    revalidatePath("/admin/calendar");
+    return { successMsg: "Event deleted successfully" };
+  } catch (error) {
+    console.error("Error deleting event:", error);
+    return { errorMsg: "Error deleting event" };
+  }
 }
 
 //----------------------------------------------------------------//

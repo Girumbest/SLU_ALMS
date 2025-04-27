@@ -152,7 +152,6 @@ model Calendar {
   eventName    String
   eventDate    DateTime?
   isRecurring  Boolean   @default(false)
-  recurringDay RecurringDay?
   eventType    EventType
   description  String?
   createdAt    DateTime  @default(now())
@@ -201,12 +200,12 @@ enum EventType {
   WORKDAY_ADJUSTMENT
 }
 
-enum RecurringDay {
-  MONDAY
-  TUESDAY
-  WEDNESDAY
-  THURSDAY
-  FRIDAY
-  SATURDAY
-  SUNDAY
-}
+// enum RecurringDay {
+//   MONDAY
+//   TUESDAY
+//   WEDNESDAY
+//   THURSDAY
+//   FRIDAY
+//   SATURDAY
+//   SUNDAY
+// }

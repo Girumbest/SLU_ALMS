@@ -41,3 +41,7 @@ Suitable Alternatives:
 Summary Table
 
 | Menu Item | Current Icon | Suggested Alternatives
+
+=========================================================
+Create Prisma Schema:
+Update your schema.prisma file to include the Account, Session, User, and VerificationToken models.

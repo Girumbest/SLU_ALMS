@@ -1,8 +1,9 @@
 "use client"
 import React, { useState } from "react";
-import { FaHome, FaUsers, FaBuilding, FaCog, FaSignOutAlt, FaBars, FaChevronDown, FaCalendarCheck, FaCalendarTimes, FaSitemap, FaUserPlus, FaAddressBook } from "react-icons/fa";
+import { FaHome, FaUsers, FaBuilding, FaCog, FaSignOutAlt, FaBars, FaChevronDown, FaCalendarCheck, FaCalendarTimes, FaSitemap, FaUserPlus, FaAddressBook, FaCalendar } from "react-icons/fa";
 import { useRouter, usePathname } from "next/navigation";
 import Image from "next/image";
+import { signOut } from 'next-auth/react';
 
 interface SidebarProps {
   isCollapsed: boolean;
@@ -27,6 +28,7 @@ const AdminSidebar = () => {
     { name: "Departments", icon: <FaSitemap />, path: "/admin/departments" },
     { name: "Attendance", icon: <FaCalendarCheck />, path: "/admin/attendance" },
     { name: "Leave", icon: <FaCalendarTimes />, path: "/admin/leave" },
+    { name: "Calendar", icon: <FaCalendar />, path: "/admin/calendar" },
   ];
 
   const settingsMenu = [
@@ -104,7 +106,9 @@ const AdminSidebar = () => {
               pathname === item.path ? "bg-blue-600" : ""
             }`}
             onClick={() => {
-              if (item.name === "Logout") alert("Logging out...");
+              if (item.name === "Logout") {
+                signOut({ callbackUrl: '/login' });
+              }
               else router.push(item.path);
             }}
           >
