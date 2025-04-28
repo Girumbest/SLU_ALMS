@@ -1,0 +1,11 @@
+/* Calendar.css */
+.has-event {
+    background-color: #7aee93; /* Light blue background */
+    border-radius: 50%;
+    color: black;
+  }
+  
+  .has-event abbr {
+    font-weight: bold;
+  }
+  

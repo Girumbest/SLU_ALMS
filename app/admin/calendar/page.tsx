@@ -9,6 +9,7 @@ import {
   saveEvent,
   deleteEvent,
 } from "@/features/hr-admin/actions";
+import "@/features/hr-admin/styles/Calendar.css";
 import toast from "react-hot-toast";
 
 interface Event {
@@ -16,6 +17,8 @@ interface Event {
   eventName: string;
   eventDate: Date | null;
   isRecurring: boolean;
+  recurringType?: string;
+  eventEnd: Date | null;
   eventType: EventType;
   description: string | null;
 }
@@ -29,8 +32,8 @@ const AdminCalendarPage: React.FC = () => {
   useEffect(() => {
     const loadEvents = async () => {
       const fetchedEvents = await fetchEvents();
-      console.log("EVENTS: ",fetchedEvents)
-      if (fetchedEvents?.errorMsg){
+      console.log("EVENTS: ", fetchedEvents);
+      if (fetchedEvents?.errorMsg) {
         toast.error(fetchedEvents.errorMsg);
         return;
       }
@@ -59,7 +62,6 @@ const AdminCalendarPage: React.FC = () => {
   };
 
   const handleEventSubmit = async (eventData: Event) => {
-    console.log("EVENT DATA: ",eventData)
     let response;
     if (selectedEvent?.id) {
       response = await saveEvent(eventData, selectedEvent.id);
@@ -87,6 +89,93 @@ const AdminCalendarPage: React.FC = () => {
     setEvents(fetchedEvents.events);
   };
 
+  // Function to check if a date has an event
+  const hasEvent = (date: Date): boolean => {
+    return events.some((event) => {
+      // alert(event.recurringType)
+      if (!event.eventDate) return false;
+
+      // Check for single-day events
+      if (!event.isRecurring) {
+        return event.eventDate.toDateString() === date.toDateString();
+      }
+
+      // Check for recurring events
+      if (event.isRecurring && event.eventEnd && event.recurringType) {
+        const startDate = new Date(event.eventDate);
+        const endDate = new Date(event.eventEnd);
+
+        if (date < startDate || date > endDate) {
+          return false; // Date is outside the event range
+        }
+
+        switch (event.recurringType) {
+          case "daily":
+            return true; // Every day within the range
+          case "weekly":
+            return date.getDay() === startDate.getDay(); // Same day of the week
+          case "monthly":
+            return date.getDate() === startDate.getDate(); // Same day of the month
+          case "yearly":
+            return (
+              date.getMonth() === startDate.getMonth() &&
+              date.getDate() === startDate.getDate()
+            ); // Same day and month
+          default:
+            return false;
+        }
+      }
+      return false;
+    });
+  };
+
+  // Function to add a CSS class to dates with events
+  const tileClassName = ({ date }: { date: Date }) => {
+    if (hasEvent(date)) {
+      return "has-event";
+    }
+    return null;
+  };
+
+  function isRecurringDate(
+    startDate: Date,
+    endDate: Date,
+    recurrence: 'daily' | 'weekly' | 'monthly' | 'yearly',
+    date: Date
+  ): boolean {
+    // Normalize all dates by removing time components
+    const normStart = new Date(startDate);
+    normStart.setHours(0, 0, 0, 0);
+    
+    const normEnd = new Date(endDate);
+    normEnd.setHours(0, 0, 0, 0);
+    
+    const normDate = new Date(date);
+    normDate.setHours(0, 0, 0, 0);
+  
+    // Check if date is within range
+    if (normDate < normStart || normDate > normEnd) {
+      return false;
+    }
+  
+    // Check recurrence pattern
+    switch (recurrence) {
+      case 'daily':
+        return true;
+      case 'weekly':
+        return normDate.getDay() === normStart.getDay();
+      case 'monthly':
+        return normDate.getDate() === normStart.getDate();
+      case 'yearly':
+        return (
+          normDate.getMonth() === normStart.getMonth() &&
+          normDate.getDate() === normStart.getDate()
+        );
+      default:
+        throw new Error(`Invalid recurrence pattern: ${recurrence}`);
+    }
+  }
+
   return (
     <div className="p-6 space-y-6">
       <h1 className="text-2xl font-bold text-gray-800">Admin Calendar</h1>
@@ -100,6 +189,7 @@ const AdminCalendarPage: React.FC = () => {
         onChange={handleDateChange}
         value={selectedDate}
         className="mt-4"
+        tileClassName={tileClassName} // Add the tileClassName prop here
       />
 
       {/* Display Events */}
@@ -111,19 +201,33 @@ const AdminCalendarPage: React.FC = () => {
           {events
             .filter(
               (event) =>
-                event.eventDate &&
-                event.eventDate.toDateString() === selectedDate.toDateString()
+                (event.eventDate &&
+                  event.eventDate.toDateString() ===
+                    selectedDate.toDateString()) ||
+                isRecurringDate(
+                  new Date(event.eventDate!),
+                  new Date(event.eventEnd!),
+                  event?.recurringType,
+                  selectedDate
+                )
             )
             .map((event) => (
               <li
                 key={event.id}
                 className="flex items-center justify-between p-3 border rounded-md shadow-sm"
               >
-                <div>
-                  <span className="font-medium">{event.eventName}</span> -{" "}
-                  {event.eventDate?.toLocaleTimeString()}
+                <div className="relative flex-1 min-w-0 flex items-center">
+                  <div className="flex items-center gap-1 shrink-0">
+                    <span className="font-medium">{event.eventName}</span>
+                    <span>-</span>
+                    <span>{event.eventDate?.toLocaleTimeString()}</span>
+                    <span>-{event?.recurringType}</span>
+                  </div>
+                  <span className="truncate ml-2">
+                    Description: {event.description}
+                  </span>
                 </div>
-                <div className="space-x-2">
+                <div className="space-x-2 shrink-0">
                   <button
                     onClick={() => handleEditEvent(event)}
                     className="bg-yellow-400 hover:bg-yellow-500 text-white font-bold py-1 px-2 rounded"
@@ -177,6 +281,12 @@ const EventForm: React.FC<{
   const [description, setDescription] = useState<string | null>(
     initialEvent?.description || ""
   );
+  const [recurringType, setRecurringType] = useState<string | undefined>(
+    initialEvent?.recurringType || undefined
+  );
+  const [eventEnd, setEventEnd] = useState<Date | null>(
+    initialEvent?.eventEnd || null
+  );
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -185,6 +295,8 @@ const EventForm: React.FC<{
       eventName,
       eventDate,
       isRecurring,
+      recurringType,
+      eventEnd,
       eventType,
       description,
     });
@@ -241,6 +353,45 @@ const EventForm: React.FC<{
               Is Recurring
             </span>
           </label>
+          {isRecurring && (
+            <div className="flex items-center space-x-2">
+              <label
+                htmlFor="recurringType"
+                className="block text-sm font-medium text-gray-700"
+              >
+                Recurring Type:
+              </label>
+             <select
+              id="recurringType"
+              name="recurringType"
+              value={recurringType || ""}
+              onChange={(e) => {
+                setRecurringType(e.target.value);
+              }}
+              className="mt-1 block w-full border-gray-300 rounded-md shadow-sm focus:border-blue-500 focus:ring-blue-500"
+            >
+              <option value="daily">Daily</option>
+              <option value="weekly">Weekly</option>
+              <option value="monthly">Monthly</option>
+              <option value="yearly">Yearly</option>
+            </select>
+
+              <label
+                htmlFor="eventEnd"
+                className="block text-sm font-medium text-gray-700"
+              >
+                End Date:
+              </label>
+              <input
+                value={eventEnd ? eventEnd.toISOString().slice(0, 10) : ""}
+                onChange={(e) => setEventEnd(new Date(e.target.value))}
+                name="eventEnd"
+                type="date"
+                id="eventEnd"
+                className="mt-1 block w-full border-gray-300 rounded-md shadow-sm focus:border-blue-500 focus:ring-blue-500"
+              />
+            </div>
+          )}
         </div>
         <div>
           <label
@@ -256,10 +407,7 @@ const EventForm: React.FC<{
             className="mt-1 block w-full border-gray-300 rounded-md shadow-sm focus:border-blue-500 focus:ring-blue-500"
           >
             <option value={EventType.HOLIDAY}>Holiday</option>
-            <option value={EventType.WEEKEND}>Weekend</option>
-            <option value={EventType.WORKDAY_ADJUSTMENT}>
-              Workday Adjustment
-            </option>
+            <option value={EventType.OTHER}>Other</option>
           </select>
         </div>
         <div>
@@ -273,7 +421,7 @@ const EventForm: React.FC<{
             id="description"
             value={description || ""}
             onChange={(e) => setDescription(e.target.value)}
-            className="mt-1 block w-full border-gray-300 rounded-md shadow-sm focus:border-blue-500 focus:ring-blue-500"
+            className="mt-1 block w-full border-gray-600 rounded-md shadow-sm focus:border-blue-500 focus:ring-blue-500"
           />
         </div>
         <div className="flex justify-end space-x-2">

@@ -5,6 +5,7 @@ import { FaUserEdit, FaTrash, FaEye, FaSearch } from "react-icons/fa";
 import DateRangePicker from "./DateRangePicker";
 import { getEmployeesAttendance } from "@/features/hr-admin/actions";
 import AttendanceEditModal from "./AttendanceEditModal";
+import toast from "react-hot-toast";
 
 interface AttendanceTime {
   morningCheckInTime: Date | null;
@@ -75,6 +76,7 @@ const AttendanceTable: React.FC<AttendanceTableProps> = ({ departments }) => {
     []
   );
   const status = ["Absent", "Present", "On_Leave"];
+  const [isWorkDay, setIsWorkDay] = useState<boolean>(true)
 
   useEffect(() => {
     setFilters({ filterKey: "", searchValue: "" });
@@ -88,6 +90,15 @@ const AttendanceTable: React.FC<AttendanceTableProps> = ({ departments }) => {
         currentPage,
         date
       );
+      if(data?.errorMsg){
+        if(!(data?.isWorkingDay)){
+          setIsWorkDay(false)
+          setFilteredEmployees([]);
+          setEmployeesAttendance([]);
+        }
+        toast.error(data.errorMsg)
+        return
+      }
       setFilteredEmployees(data.employees);
       setEmployeesAttendance(data.employees);
       setSettings(data.settings);
@@ -536,10 +547,11 @@ const AttendanceTable: React.FC<AttendanceTableProps> = ({ departments }) => {
                   </td>
                 </tr>
               ))
-            ) : (
+            ) : 
+            (
               <tr>
                 <td colSpan={10} className="p-5 text-center text-gray-500">
-                  No employees found.
+                  {!isWorkDay ?"Today is not a work day.":"No employees found."}
                 </td>
               </tr>
             )}

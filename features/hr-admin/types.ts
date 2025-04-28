@@ -1,5 +1,4 @@
-import { EventType } from '@prisma/client';
-
+import { EventType, RecurringType } from "@prisma/client";
 
 export type UserFormState = {
     errors?: Record<string, string[]>;
@@ -14,6 +13,8 @@ export interface Event {
     eventName: string;
     eventDate: Date | null;
     isRecurring: boolean;
+    recurringType?: string;
+    eventEnd: Date | null;
     eventType: EventType;
     description: string | null;
   }

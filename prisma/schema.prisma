@@ -152,10 +152,18 @@ model Calendar {
   eventName    String
   eventDate    DateTime?
   isRecurring  Boolean   @default(false)
+  recurringType String? @default("yearly")
+  eventEnd     DateTime?
   eventType    EventType
   description  String?
   createdAt    DateTime  @default(now())
   updatedAt    DateTime  @updatedAt
+}
+enum RecurringType {
+  daily
+  weekly
+  monthly
+  yearly
 }
 
 model Settings {
@@ -196,9 +204,9 @@ enum Language {
 
 enum EventType {
   HOLIDAY
-  WEEKEND
-  WORKDAY_ADJUSTMENT
+  OTHER
 }
+
 
 // enum RecurringDay {
 //   MONDAY

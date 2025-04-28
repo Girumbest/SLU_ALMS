@@ -9,6 +9,7 @@ import { UserFormState, Event } from "./types";
 import { writeFile } from "fs/promises";
 import { generateUniqueFileName } from "@/utils/generate";
 import { revalidatePath } from "next/cache";
+import { RecurringType } from "@prisma/client";
 
 export async function createUser(
   prevState: UserFormState,
@@ -24,7 +25,8 @@ export async function createUser(
     };
   }
   let data = validatedData.data;
-
+  // console.log(data);
+  
   //Check for existence of a user with the same username
   const existingUser = await prisma.user.findUnique({
     where: {
@@ -55,11 +57,16 @@ export async function createUser(
       emergencyContactPhone: data.emergencyContactPhone,
       hireDate: new Date(data.hireDate),
       jobTitle: data.jobTitle,
+      salary: data.salary,
+      positionLevel: data.positionLevel,
+      educationalLevel: data.educationalLevel,
+      directDepositInfo: data.directDepositInfo,
       maritalStatus: data.maritalStatus,
       departmentId: data.department,
       role: data.role,
 
       photograph: await savePhoto(data.photograph),
+      cv: (data.cv || undefined) && (await saveCV(data.cv as File)),
     },
   });
 
@@ -127,7 +134,7 @@ export async function editUser(
 
     updateData[field] = value;
   }
-  console.log("UPDATE DATA: ", updateData);
+  // console.log("UPDATE DATA: ", updateData);
   // return {successMsg: "RECEIVED AT TEST POINT"}
   // Save to database
   await prisma.user.update({
@@ -482,6 +489,10 @@ export async function getEmployeesAttendance(
   page = 1,
   date = new Date()
 ) {
+  if(!(await isWorkingDay(date))){
+    console.log("NOT A WORKING DAY")
+    return {errorMsg: "Not a working day", isWorkingDay: false}
+  }
   const settings = await prisma.settings.findMany({
     where: {
       key: {
@@ -538,8 +549,7 @@ export async function getEmployeesAttendance(
   const total = await prisma.user.count();
   (employees as any).total = total;
 
-  console.log(employees[0].username, employees[0].attendances);
-  console.log("date: ", date);
+  // console.log(employees[0].username, employees[0].attendances);
   return { employees, total, settings };
 }
 
@@ -872,7 +882,13 @@ export async function createLeaveRequest(
   }
 }
 
+
 async function getEmployeeAttendance(empId: number, date: Date) {
+  if(!(await isWorkingDay(date))){
+    console.log("NOT A WORKING DAY")
+    return {errorMsg: "Not a working day", isWorkingDay: false}
+  }
+  //-----------------------------------------//
   const atten = await prisma.attendance.findFirst({
     where: {
       AND: [
@@ -911,6 +927,12 @@ export async function registerAttendance(
   prevState: UserFormState,
   formData: FormData
 ) {
+  if(!(await isWorkingDay())){
+    console.log("NOT A WORKING DAY")
+    return {errorMsg: "Not a working day", isWorkingDay: false}
+  }
+
+
   const rawData = Object.fromEntries(formData.entries());
   // const validatedData = employeeEditSchema.safeParse(rawData);
   const settings = await prisma.settings.findMany({
@@ -1127,16 +1149,25 @@ export async function fetchEvents() {
 
 export async function saveEvent(eventData: Event, eventId?: number) {
   try {
-    const { eventName, eventDate, isRecurring, eventType, description } =
+    const { eventName, eventDate, isRecurring, eventType, description} =
       eventData;
+    let recurringType:string;
+    let eventEnd:Date | undefined;
+    if(isRecurring){
+      recurringType = eventData.recurringType
+      eventEnd = new Date(eventData.eventEnd!)
+    }
+    console.log("RECURRING TYPE: ", recurringType!, "EVENT END: ", eventEnd)
     if (!eventId) {
       const newEvent = await prisma.calendar.create({
         data: {
           eventName,
-          eventDate: new Date(eventDate),
+          eventDate: new Date(eventDate!),
           isRecurring,
           eventType,
           description,
+          recurringType,
+          eventEnd
         },
       });
       revalidatePath("/admin/calendar");
@@ -1150,6 +1181,8 @@ export async function saveEvent(eventData: Event, eventId?: number) {
         isRecurring,
         eventType,
         description,
+        recurringType,
+        eventEnd
       },
     });
     revalidatePath("/admin/calendar");
@@ -1248,4 +1281,80 @@ const formatDate = async (date: Date) => {
 function timeStringToMinutes(timeStr: string) {
   const [hours, minutes] = timeStr.split(":").map(Number);
   return hours * 60 + minutes;
+}
+
+function isRecurringDate(
+  startDate: Date,
+  endDate: Date,
+  recurrence: 'daily' | 'weekly' | 'monthly' | 'yearly',
+  date: Date
+): boolean {
+  // Normalize all dates by removing time components
+  const normStart = new Date(startDate);
+  normStart.setHours(0, 0, 0, 0);
+  
+  const normEnd = new Date(endDate);
+  normEnd.setHours(0, 0, 0, 0);
+  
+  const normDate = new Date(date);
+  normDate.setHours(0, 0, 0, 0);
+
+  // Check if date is within range
+  if (normDate < normStart || normDate > normEnd) {
+    return false;
+  }
+
+  // Check recurrence pattern
+  switch (recurrence) {
+    case 'daily':
+      return true;
+    case 'weekly':
+      return normDate.getDay() === normStart.getDay();
+    case 'monthly':
+      return normDate.getDate() === normStart.getDate();
+    case 'yearly':
+      return (
+        normDate.getMonth() === normStart.getMonth() &&
+        normDate.getDate() === normStart.getDate()
+      );
+    default:
+      throw new Error(`Invalid recurrence pattern: ${recurrence}`);
+  }
+}
+
+function isSameDate(date1: Date, date2: Date): boolean {
+  return date1.setHours(0, 0, 0, 0) === date2.setHours(0, 0, 0, 0);
+}
+
+async function isWorkingDay(date?:Date) {
+   //Weekend
+   const testDate = date ? date : new Date()
+   if(testDate.getDay() === 0 || testDate.getDay() === 6){
+    return false
+  }
+  //Check if there are any events //
+  //None recurring event
+  const event = await prisma.calendar.findMany({
+    where: {
+      isRecurring: false
+    }
+  })
+  if(event.some(event => isSameDate(new Date(event?.eventDate), testDate))){
+    return false
+  }
+  //Recurring event
+  const recurringEvents = await prisma.calendar.findMany({
+    where: {
+      isRecurring: true
+    }
+  })
+  const hasRecurringEvent = recurringEvents.some((event) => {
+    return event?.eventDate && event?.eventEnd && event?.recurringType && 
+           isRecurringDate(event.eventDate, event.eventEnd, event.recurringType, testDate);
+  });
+  if (hasRecurringEvent) {
+    return false;
+  }
+  //Work Day
+  return true
 }

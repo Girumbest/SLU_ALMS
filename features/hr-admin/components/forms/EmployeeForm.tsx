@@ -41,7 +41,7 @@ export default function EmployeeRegisterForm({departments}: {departments: {name:
     if(state.successMsg){
       toast.success(state.successMsg)
       // Request the form to reset once the action has completed
-      // formRef.current?.reset();
+      formRef.current?.reset();
     }else if(state.errorMsg){
       toast.error(state.errorMsg)
     }
@@ -235,7 +235,7 @@ export default function EmployeeRegisterForm({departments}: {departments: {name:
         {/* Certificate Upload */}
         <div className="col-span-1 md:col-span-2">
           <label className="font-semibold text-gray-700 flex items-center">
-            <FaUpload className="mr-2 text-blue-600" /> Upload Certificates (PDF):
+            <FaUpload className="mr-2 text-blue-600" /> Upload CV (PDF):
           </label>
           <input type="file" accept="application/pdf" name="cv" className="input mt-2 bg-white" />
         </div>

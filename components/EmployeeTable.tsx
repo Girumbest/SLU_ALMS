@@ -30,7 +30,7 @@ interface EmployeeTableProps {
 
 const EmployeeTable: React.FC<EmployeeTableProps> = ({ departments }) => {
   const [currentPage, setCurrentPage] = useState(1);
-  const employeesPerPage = 5;
+  const employeesPerPage = 10;
 
   const [filters, setFilters] = useState<{
     filterKey: string;

@@ -52,7 +52,10 @@ export const employeeSchema = z.object({
   directDepositInfo: z.string().optional(),
   // certificates: z.array(z.instanceof(File)).optional(),
   photograph: photoSchema,//z.instanceof(File, { message: "Invalid photograph format" }),
-  // cv: fileSchema.optional()
+  cv: z.preprocess(
+    (val) => (val === "" ? undefined : val), // Transform empty string to undefined
+    fileSchema.optional()
+  ),
 });
 export const employeeEditSchema = z.object({
   id: z.coerce.number().optional(),
