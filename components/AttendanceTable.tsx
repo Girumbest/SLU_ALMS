@@ -35,10 +35,11 @@ interface Employee {
 }
 
 interface AttendanceTableProps {
-  departments: { name: string; id: number }[];
+  departments?: { name: string; id: number }[];
+  supId?: number;
 }
 
-const AttendanceTable: React.FC<AttendanceTableProps> = ({ departments }) => {
+const AttendanceTable: React.FC<AttendanceTableProps> = ({ departments,supId }) => {
   const [attendance, setAttendance] = useState<
     Employee["attendances"] | undefined
   >();
@@ -78,6 +79,7 @@ const AttendanceTable: React.FC<AttendanceTableProps> = ({ departments }) => {
   const status = ["Absent", "Present", "On_Leave"];
   const [isWorkDay, setIsWorkDay] = useState<boolean>(true)
 
+
   useEffect(() => {
     setFilters({ filterKey: "", searchValue: "" });
     setCurrentPage(1);
@@ -88,7 +90,8 @@ const AttendanceTable: React.FC<AttendanceTableProps> = ({ departments }) => {
         filters.filterKey,
         employeesPerPage,
         currentPage,
-        date
+        date,
+        supId
       );
       if(data?.errorMsg){
         if(!(data?.isWorkingDay)){
@@ -224,6 +227,7 @@ const AttendanceTable: React.FC<AttendanceTableProps> = ({ departments }) => {
       setFilteredEmployees(
         employeesAttendance.filter((employee) =>
           employee.attendances[0]?.status.toLowerCase().includes(value.toLowerCase())
+          || employee?.leaveRequests?.length > 0
         )
       );
     }
@@ -241,7 +245,7 @@ const AttendanceTable: React.FC<AttendanceTableProps> = ({ departments }) => {
         <input
           className="border border-gray-300 rounded-md p-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent w-40"
           type="date"
-          max={new Date().toISOString().split("T")[0]}
+          // max={new Date().toISOString().split("T")[0]}
           defaultValue={date.toISOString().split("T")[0]}
           onChange={(e) => setDate(new Date(e.target.value))}
         />
@@ -267,7 +271,7 @@ const AttendanceTable: React.FC<AttendanceTableProps> = ({ departments }) => {
                 "Actions",
               ].map((header, index) => (
                 <th key={index} className="p-3 relative">
-                  {header}
+                  {header === "Department" && supId ? undefined : header}
                 </th>
               ))}
             </tr>
@@ -315,25 +319,20 @@ const AttendanceTable: React.FC<AttendanceTableProps> = ({ departments }) => {
                     </div>
                   )}
 
-                  {header === "Department" && (
+                  {header === "Department" && !supId &&(
                     <select
-                      onChange={(e) =>
-                        handleFilterChange("department", e.target.value)
-                      }
-                      className="w-full p-2 bg-white border border-gray-300 rounded focus:outline-none"
-                    >
-                      <option
-                        value=""
-                        selected={filters.filterKey != "department"}
-                      >
-                        All
+                    onChange={(e) => handleFilterChange("department", e.target.value)}
+                    className="w-full p-2 bg-white border border-gray-300 rounded focus:outline-none"
+                    value={filters.filterKey === "department" ? filters.searchValue : ""}
+                  >
+                    <option value="">All</option>
+                    {departments?.map((dept) => (
+                      <option key={dept?.name} value={dept?.name}>
+                        {dept?.name}
                       </option>
-                      {departments.map((dept) => (
-                        <option key={dept?.name} value={dept?.name}>
-                          {dept?.name}
-                        </option>
-                      ))}
-                    </select>
+                    ))}
+                  </select>
+                  
                   )}
 
                   {header === "Status" && (
@@ -401,7 +400,7 @@ const AttendanceTable: React.FC<AttendanceTableProps> = ({ departments }) => {
                         : field === "hireDate"
                         ? new Date(employee.hireDate!).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' }) :*/}
                       {field === "department"
-                        ? employee.department?.name
+                        ? !supId && employee.department?.name
                         : employee[field as keyof Employee]?.toString()}
                     </td>
                   ))}
@@ -476,7 +475,7 @@ const AttendanceTable: React.FC<AttendanceTableProps> = ({ departments }) => {
                             ))}
                         </div>
                       ) : field.endsWith("CheckOutTime") &&
-                        !employee.attendances[0]?.checkOutEnabled ? (
+                      ((employee.attendances[0]&&!employee.attendances[0]?.checkOutEnabled)||(!employee.attendances[0] && (settings?.find(item => item.key === 'check_out_enabled')?.value !== 'true'))) ? (
                         "N/A"
                       ) : (
                         "-"
@@ -491,6 +490,7 @@ const AttendanceTable: React.FC<AttendanceTableProps> = ({ departments }) => {
                     : "Absent"}
 
                   </td> */}
+                  {/* Status Badge */}
                   <td className="p-3 text-gray-600 truncate max-w-[150px]">
                     {employee.attendances[0]?.status ? (
                       <span
@@ -515,7 +515,13 @@ const AttendanceTable: React.FC<AttendanceTableProps> = ({ departments }) => {
                           .toUpperCase() +
                           employee.attendances[0].status.slice(1).toLowerCase()}
                       </span>
-                    ) : (
+                    ) : employee?.leaveRequests?.length > 0
+                    ? 
+                    (<span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-800">
+                      On Leave
+                    </span>)
+                    :
+                    (
                       <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-red-100 text-red-800">
                         Absent
                       </span>
@@ -529,8 +535,10 @@ const AttendanceTable: React.FC<AttendanceTableProps> = ({ departments }) => {
                     >
                       <FaEye size={18} />
                     </Link>
+                    {(supId && Boolean(settings?.find(item => item.key === 'check_out_enabled')?.value!) || !supId) &&
                     <button
                       // href={`./employees/edit/${employee.username}`}
+                      disabled={employee.attendances[0]?.status === "ON_LEAVE"}
                       className="text-green-600 hover:text-green-800 mx-1"
                       onClick={(e) =>
                         openAttendanceEditModal(
@@ -541,9 +549,10 @@ const AttendanceTable: React.FC<AttendanceTableProps> = ({ departments }) => {
                     >
                       <FaUserEdit size={18} />
                     </button>
-                    <button className="text-red-600 hover:text-red-800 mx-1">
+                    }
+                    {/* <button className="text-red-600 hover:text-red-800 mx-1">
                       <FaTrash size={18} />
-                    </button>
+                    </button> */}
                   </td>
                 </tr>
               ))
@@ -551,7 +560,7 @@ const AttendanceTable: React.FC<AttendanceTableProps> = ({ departments }) => {
             (
               <tr>
                 <td colSpan={10} className="p-5 text-center text-gray-500">
-                  {!isWorkDay ?"Today is not a work day.":"No employees found."}
+                  {!filters.filterKey && !isWorkDay ?"Today is not a work day.":"No employees found."}
                 </td>
               </tr>
             )}
@@ -594,6 +603,7 @@ const AttendanceTable: React.FC<AttendanceTableProps> = ({ departments }) => {
           attendanceSettings={settings}
           employeeId={employeeId}
           selectedDate={date}
+          supId={supId}
         />
         // )
       )}

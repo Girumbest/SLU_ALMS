@@ -10,6 +10,13 @@ import { writeFile } from "fs/promises";
 import { generateUniqueFileName } from "@/utils/generate";
 import { revalidatePath } from "next/cache";
 import { RecurringType } from "@prisma/client";
+import { getServerSession } from "next-auth";
+import { authOptions } from "@/lib/auth";
+
+async function session() {
+  //Logged-in User session
+  return await getServerSession(authOptions);
+}
 
 export async function createUser(
   prevState: UserFormState,
@@ -482,17 +489,34 @@ export async function getDepartmentEmployees(
   };
 }
 
+//Get all employees attendance of selected date
 export async function getEmployeesAttendance(
   query = "",
   searchBy: string,
   employeesPerPage = 10,
   page = 1,
-  date = new Date()
+  date = new Date(),
+  supId?: number
 ) {
   if(!(await isWorkingDay(date))){
     console.log("NOT A WORKING DAY")
     return {errorMsg: "Not a working day", isWorkingDay: false}
   }
+  
+  const supervisor = supId && await prisma.user.findUnique({
+      where: {
+        id: supId,
+      },
+      select: {
+        department: {
+          select: {
+            id: true,
+          },
+        },
+      },
+  })
+  supervisor && console.log("SUPER",supervisor.department?.id)
+
   const settings = await prisma.settings.findMany({
     where: {
       key: {
@@ -506,10 +530,13 @@ export async function getEmployeesAttendance(
     },
   });
 
+
   const employees = await prisma.user.findMany({
     skip: (page - 1) * employeesPerPage,
     take: employeesPerPage,
-    //_count
+    where: {
+      departmentId: supervisor ? supervisor?.department?.id : undefined,
+    },
     select: {
       id: true,
       firstName: true,
@@ -544,6 +571,22 @@ export async function getEmployeesAttendance(
           date: true,
         },
       },
+  //check if employee is on-leave
+      leaveRequests:{
+        where: {
+          status: "APPROVED",
+          startDate: {
+            lte: date,
+          },
+          endDate: {
+            gte: date
+          }
+        },
+        select:{
+          startDate: true,
+          endDate: true,
+        }
+      }
     },
   });
   const total = await prisma.user.count();
@@ -553,7 +596,7 @@ export async function getEmployeesAttendance(
   return { employees, total, settings };
 }
 
-//get all the attendances of an employee with id
+//get all the attendances of an employee(by emp id)
 export async function getAllAttendance(
   empId: number,
 
@@ -596,7 +639,23 @@ export async function getAllAttendance(
   };
 
   const whereClause = await getWhereClause(filterValue, query);
-  console.log("WHERE CLAUSE:", whereClause);
+  //not sure if leave requests of an employee is needed here
+  const leaveWhereClause = ((filterValue: string, query: string) => {
+    if(filterValue === "date"){
+      if(!query)return
+      return {
+        startDate: {
+          lte: new Date(query.split(":")[0]),
+        },
+        endDate: {
+          gte: new Date(query.split(":")[0]),
+          lte:
+          (query.split(":")[1] && new Date(query.split(":")[1])) ||
+          new Date(),
+        }
+      };
+    }
+  })(filterValue, query)
 
   const settings = await prisma.settings.findMany({
     where: {
@@ -647,9 +706,19 @@ export async function getAllAttendance(
           date: true,
         },
       },
+      leaveRequests:{
+        where: {
+          status: "APPROVED",
+          ...leaveWhereClause
+        },
+        select:{
+          startDate: true,
+          endDate: true,
+        }
+      }
     },
   });
-
+  console.log("EMPLOYEE WITH LEAVE: ",employee);
   const total = await prisma.attendance.count({ where: { userId: empId } });
   (employee as any).total = total;
 
@@ -798,9 +867,16 @@ export async function createLeaveRequest(
     const reason = formData.get("reason") as string;
     const empId = formData.get("empId") as string;
 
+    const user = (await session())?.user;
+
+    if(user?.role !== "Employee" && empId != user?.id){
+      return {
+        errorMsg: "Validation failed.",
+      };
+    }
+
     // Validate the data (add more validation as needed)
     if (!empId || !leaveTypeId || !startDate || !endDate || !reason) {
-      console.log(empId, leaveTypeId, "__", startDate, endDate, reason);
       return {
         errorMsg: "Please fill in all fields.",
       };
@@ -882,11 +958,11 @@ export async function createLeaveRequest(
   }
 }
 
-
+//Not sure if i'm using this function somewhere(forgot why it's created!)
 async function getEmployeeAttendance(empId: number, date: Date) {
-  if(!(await isWorkingDay(date))){
-    console.log("NOT A WORKING DAY")
-    return {errorMsg: "Not a working day", isWorkingDay: false}
+  if (!(await isWorkingDay(date))) {
+    console.log("NOT A WORKING DAY");
+    return { errorMsg: "Not a working day", isWorkingDay: false };
   }
   //-----------------------------------------//
   const atten = await prisma.attendance.findFirst({
@@ -927,11 +1003,10 @@ export async function registerAttendance(
   prevState: UserFormState,
   formData: FormData
 ) {
-  if(!(await isWorkingDay())){
-    console.log("NOT A WORKING DAY")
-    return {errorMsg: "Not a working day", isWorkingDay: false}
+  if (!(await isWorkingDay())) {
+    console.log("NOT A WORKING DAY");
+    return { errorMsg: "Not a working day", isWorkingDay: false };
   }
-
 
   const rawData = Object.fromEntries(formData.entries());
   // const validatedData = employeeEditSchema.safeParse(rawData);
@@ -982,158 +1057,236 @@ export async function registerAttendance(
   let afternoonCheckOut = rawData.afternoonCheckOutTime as string;
   const status = rawData.status as string;
 
-  if (!empId && (!date || !selectedDate)) {
-    return { errorMsg: "Validation failed", errors: { morningCheckIn: [""] } };
-  }
-
-  if (status && status == "Absent") {
-    morningCheckIn =
-      morningCheckOut =
-      afternoonCheckIn =
-      afternoonCheckOut =
-        "";
-  }
-
-  const data: any = (outEnabled: Boolean) => {
-    const currentDate = date || selectedDate;
-
-    if (!outEnabled) {
-      return {
-        morningCheckInTime:
-          (morningCheckIn &&
-            new Date(
-              new Date(currentDate).setHours(
-                Number(morningCheckIn.split(":")[0]),
-                Number(morningCheckIn.split(":")[1])
-              )
-            )) ||
-          undefined,
-        afternoonCheckInTime:
-          (afternoonCheckIn &&
-            new Date(
-              new Date(currentDate).setHours(
-                Number(afternoonCheckIn.split(":")[0]),
-                Number(afternoonCheckIn.split(":")[1])
-              )
-            )) ||
-          undefined,
-
-        isLateMorningCheckIn:
-          (morningCheckIn || undefined) &&
-          morningCheckInTime + checkInThreshold <
-            timeStringToMinutes(morningCheckIn),
-        isLateAfternoonCheckIn:
-          (afternoonCheckIn || undefined) &&
-          afternoonCheckInTime + checkInThreshold <
-            timeStringToMinutes(afternoonCheckIn),
-
-        status: morningCheckIn || afternoonCheckIn ? "PRESENT" : "ABSENT",
-        checkOutEnabled: false,
-      };
-    } else if (outEnabled) {
-      console.log(
-        "MORRNING: ",
-        morningCheckIn &&
-          morningCheckInTime + checkInThreshold <
-            timeStringToMinutes(morningCheckIn)
-      );
-      console.log(
-        "IS_LATE: ",
-        (morningCheckIn || undefined) &&
-          morningCheckInTime + checkInThreshold <
-            timeStringToMinutes(morningCheckIn)
-      );
-      return {
-        morningCheckInTime:
-          (morningCheckIn &&
-            new Date(
-              new Date(currentDate).setHours(
-                Number(morningCheckIn.split(":")[0]),
-                Number(morningCheckIn.split(":")[1])
-              )
-            )) ||
-          undefined,
-        afternoonCheckInTime:
-          (afternoonCheckIn &&
-            new Date(
-              new Date(currentDate).setHours(
-                Number(afternoonCheckIn.split(":")[0]),
-                Number(afternoonCheckIn.split(":")[1])
-              )
-            )) ||
-          undefined,
-        morningCheckOutTime:
-          (morningCheckOut &&
-            new Date(
-              new Date(currentDate).setHours(
-                Number(morningCheckOut.split(":")[0]),
-                Number(morningCheckOut.split(":")[1])
-              )
-            )) ||
-          undefined,
-        afternoonCheckOutTime:
-          (afternoonCheckOut &&
-            new Date(
-              new Date(currentDate).setHours(
-                Number(afternoonCheckOut.split(":")[0]),
-                Number(afternoonCheckOut.split(":")[1])
-              )
-            )) ||
-          undefined,
-
-        isLateMorningCheckIn:
-          (morningCheckIn || undefined) &&
-          morningCheckInTime + checkInThreshold <
-            timeStringToMinutes(morningCheckIn),
-        isLateAfternoonCheckIn:
-          (afternoonCheckIn || undefined) &&
-          afternoonCheckInTime + checkInThreshold <
-            timeStringToMinutes(afternoonCheckIn),
-        isEarlyMorningCheckOut:
-          (morningCheckOut || undefined) &&
-          morningCheckOutTime - checkOutThreshold >
-            timeStringToMinutes(morningCheckOut),
-        isEarlyAfternoonCheckOut:
-          (afternoonCheckOut || undefined) &&
-          afternoonCheckOutTime - checkOutThreshold >
-            timeStringToMinutes(afternoonCheckOut),
-
-        status: morningCheckIn || afternoonCheckIn ? "PRESENT" : "ABSENT",
-        checkOutEnabled: true,
-      };
-    }
-  };
-
-  if (date) {
-    const employeeAttendance = await getEmployeeAttendance(Number(empId), date);
-    console.log("DATA: ", data(employeeAttendance?.checkOutEnabled));
-    if (employeeAttendance?.id) {
-      const test = await prisma.attendance.update({
-        where: {
-          id: employeeAttendance.id,
-        },
-        data: data(employeeAttendance.checkOutEnabled),
-      });
-      console.log("UPDATE RES: ", test);
-    }
-  } else {
-    console.log("DATE: ", selectedDate);
-
-    await prisma.attendance.create({
-      data: {
-        userId: Number(empId),
-        date: selectedDate,
-        manuallyCheckedIn: true,
-        ...data(checkOutEnabled),
+  const supId = rawData.supId as string;
+  //Supervisor updating checkout
+  if (supId) {
+    const supervisor = await prisma.user.findUnique({
+      where: {
+        id: Number(supId),
+      },
+      select: {
+        departmentId: true,
       },
     });
+    const user = await prisma.user.findUnique({
+      where: {
+        id: Number(empId),
+      },
+      select: {
+        departmentId: true,
+      },
+    });
+    if (
+      supervisor?.departmentId !== user?.departmentId &&
+        settings?.find((item) => item.key === "check_out_enabled")?.value! !==
+          "true"
+    ) {
+      return {
+        errorMsg: "Validation failed",
+        errors: { morningCheckIn: [""] },
+      };
+    }
   }
 
-  revalidatePath("/admin/attendance");
-  revalidatePath(`/admin/attendance/${empId}`);
+    if (!empId && (!date || !selectedDate)) {
+      return {
+        errorMsg: "Validation failed",
+        errors: { morningCheckIn: [""] },
+      };
+    }
 
-  return { successMsg: "Attendance registered successfully!" };
-}
+    if (status && status == "Absent") {
+      morningCheckIn =
+        morningCheckOut =
+        afternoonCheckIn =
+        afternoonCheckOut =
+          "";
+    }
+
+    //Attendance Updation or Creation Data
+    const data: any = (outEnabled: Boolean) => {
+      const currentDate = date || selectedDate;
+
+      if (!outEnabled) {
+        return {
+          morningCheckInTime:
+            (morningCheckIn &&
+              new Date(
+                new Date(currentDate).setHours(
+                  Number(morningCheckIn.split(":")[0]),
+                  Number(morningCheckIn.split(":")[1])
+                )
+              )) ||
+            undefined,
+          afternoonCheckInTime:
+            (afternoonCheckIn &&
+              new Date(
+                new Date(currentDate).setHours(
+                  Number(afternoonCheckIn.split(":")[0]),
+                  Number(afternoonCheckIn.split(":")[1])
+                )
+              )) ||
+            undefined,
+
+          isLateMorningCheckIn:
+            (morningCheckIn || undefined) &&
+            morningCheckInTime + checkInThreshold <
+              timeStringToMinutes(morningCheckIn),
+          isLateAfternoonCheckIn:
+            (afternoonCheckIn || undefined) &&
+            afternoonCheckInTime + checkInThreshold <
+              timeStringToMinutes(afternoonCheckIn),
+
+          status: morningCheckIn || afternoonCheckIn ? "PRESENT" : "ABSENT",
+          checkOutEnabled: false,
+        };
+      } else if (supId && outEnabled) {
+        //supervisor edit checkout
+        return {
+          morningCheckInTime: undefined,
+          afternoonCheckInTime: undefined,
+          morningCheckOutTime:
+            (morningCheckOut &&
+              new Date(
+                new Date(currentDate).setHours(
+                  Number(morningCheckOut.split(":")[0]),
+                  Number(morningCheckOut.split(":")[1])
+                )
+              )) ||
+            undefined,
+          afternoonCheckOutTime:
+            (afternoonCheckOut &&
+              new Date(
+                new Date(currentDate).setHours(
+                  Number(afternoonCheckOut.split(":")[0]),
+                  Number(afternoonCheckOut.split(":")[1])
+                )
+              )) ||
+            undefined,
+          isLateMorningCheckIn: undefined,
+          isLateAfternoonCheckIn: undefined,
+
+          isEarlyMorningCheckOut:
+            (morningCheckOut || undefined) &&
+            morningCheckOutTime - checkOutThreshold >
+              timeStringToMinutes(morningCheckOut),
+          isEarlyAfternoonCheckOut:
+            (afternoonCheckOut || undefined) &&
+            afternoonCheckOutTime - checkOutThreshold >
+              timeStringToMinutes(afternoonCheckOut),
+
+          status: morningCheckIn || afternoonCheckIn ? "PRESENT" : "ABSENT",
+          checkOutEnabled: true,
+        };
+      } else if (outEnabled) {
+        console.log(
+          "MORRNING: ",
+          morningCheckIn &&
+            morningCheckInTime + checkInThreshold <
+              timeStringToMinutes(morningCheckIn)
+        );
+        console.log(
+          "IS_LATE: ",
+          (morningCheckIn || undefined) &&
+            morningCheckInTime + checkInThreshold <
+              timeStringToMinutes(morningCheckIn)
+        );
+        return {
+          morningCheckInTime:
+            (morningCheckIn &&
+              new Date(
+                new Date(currentDate).setHours(
+                  Number(morningCheckIn.split(":")[0]),
+                  Number(morningCheckIn.split(":")[1])
+                )
+              )) ||
+            undefined,
+          afternoonCheckInTime:
+            (afternoonCheckIn &&
+              new Date(
+                new Date(currentDate).setHours(
+                  Number(afternoonCheckIn.split(":")[0]),
+                  Number(afternoonCheckIn.split(":")[1])
+                )
+              )) ||
+            undefined,
+          morningCheckOutTime:
+            (morningCheckOut &&
+              new Date(
+                new Date(currentDate).setHours(
+                  Number(morningCheckOut.split(":")[0]),
+                  Number(morningCheckOut.split(":")[1])
+                )
+              )) ||
+            undefined,
+          afternoonCheckOutTime:
+            (afternoonCheckOut &&
+              new Date(
+                new Date(currentDate).setHours(
+                  Number(afternoonCheckOut.split(":")[0]),
+                  Number(afternoonCheckOut.split(":")[1])
+                )
+              )) ||
+            undefined,
+
+          isLateMorningCheckIn:
+            (morningCheckIn || undefined) &&
+            morningCheckInTime + checkInThreshold <
+              timeStringToMinutes(morningCheckIn),
+          isLateAfternoonCheckIn:
+            (afternoonCheckIn || undefined) &&
+            afternoonCheckInTime + checkInThreshold <
+              timeStringToMinutes(afternoonCheckIn),
+          isEarlyMorningCheckOut:
+            (morningCheckOut || undefined) &&
+            morningCheckOutTime - checkOutThreshold >
+              timeStringToMinutes(morningCheckOut),
+          isEarlyAfternoonCheckOut:
+            (afternoonCheckOut || undefined) &&
+            afternoonCheckOutTime - checkOutThreshold >
+              timeStringToMinutes(afternoonCheckOut),
+
+          status: morningCheckIn || afternoonCheckIn ? "PRESENT" : "ABSENT",
+          checkOutEnabled: true,
+        };
+      }
+    };
+
+    if (date) {
+      const employeeAttendance = await getEmployeeAttendance(
+        Number(empId),
+        date
+      );
+      console.log("DATA: ", data(employeeAttendance?.checkOutEnabled));
+      //if attendance exists update
+      if (employeeAttendance?.id) {
+        const res = await prisma.attendance.update({
+          where: {
+            id: employeeAttendance.id,
+          },
+          data: data(employeeAttendance.checkOutEnabled),
+        });
+        console.log("UPDATE RESULT: ", res);
+      }
+    } else {//if new create attendance
+      console.log("SELECTED DATE: ", selectedDate);
+
+      await prisma.attendance.create({
+        data: {
+          userId: Number(empId),
+          date: selectedDate,
+          manuallyCheckedIn: true,
+          ...data(checkOutEnabled),
+        },
+      });
+    }
+
+    revalidatePath("/admin/attendance");
+    revalidatePath(`/admin/attendance/${empId}`);
+
+    return { successMsg: "Attendance registered successfully!" };
+  }
+
 
 //Calendar
 export async function fetchEvents() {

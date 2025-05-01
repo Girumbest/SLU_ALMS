@@ -5,6 +5,7 @@ import { createLeaveRequest, getLeaveBalance, getLeaveTypes } from "@/features/h
 import { UserFormState } from "@/features/hr-admin/types";
 import toast from "react-hot-toast";
 import { useRouter } from "next/navigation";
+import { useSession } from "next-auth/react";
 
 interface LeaveType {
   id: number;
@@ -26,7 +27,8 @@ const LeaveRequestPage = () => {
   const [state, formAction] = useActionState(createLeaveRequest, initialState);
 
   const [leaveBalance, setLeaveBalance] = useState<number | null>(null);
-  const empId = 2; //temp
+  const { data: session } = useSession();
+  const empId = session?.user?.id; //temp
   
   useEffect(() => {
     getLeaveTypes().then((data) => {

@@ -245,10 +245,10 @@ const AttendanceDetailTable: React.FC<AttendanceTableProps> = ({ departments, em
                         handleFilterChange("department", e.target.value)
                       }
                       className="w-full p-2 bg-white border border-gray-300 rounded focus:outline-none"
+                      value={filters.filterKey === "department" ? filters.searchValue : ""}
                     >
                       <option
                         value=""
-                        selected={filters.filterKey != "department"}
                       >
                         All
                       </option>
@@ -282,7 +282,7 @@ const AttendanceDetailTable: React.FC<AttendanceTableProps> = ({ departments, em
                     <div className="relative">
                       <DateRangePicker
                         onDateRangeChange={handleDateRangeChange}
-                        style="-right-40"
+                        style="left-5 right-auto"
                       />
                     </div>
                   )}
@@ -425,7 +425,13 @@ const AttendanceDetailTable: React.FC<AttendanceTableProps> = ({ departments, em
                           .toUpperCase() +
                           attendance.status.slice(1).toLowerCase()}
                       </span>
-                    ) : (
+                    ) : attendance?.leaveRequests?.length > 0//Not needed
+                    ? 
+                    (<span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-800">
+                      On Leave
+                    </span>)
+                    :
+                    (
                       <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-red-100 text-red-800">
                         Absent
                       </span>
@@ -433,12 +439,12 @@ const AttendanceDetailTable: React.FC<AttendanceTableProps> = ({ departments, em
                   </td>
 
                   <td className="p-3 text-center flex">
-                    <Link
+                    {/* <Link
                       href={`./employees/${""}`}
                       className="text-blue-600 hover:text-blue-800 mx-1"
                     >
                       <FaEye size={18} />
-                    </Link>
+                    </Link> */}
                     <button
                       // href={`./employees/edit/${employee.username}`}
                       className="text-green-600 hover:text-green-800 mx-1"
@@ -451,9 +457,9 @@ const AttendanceDetailTable: React.FC<AttendanceTableProps> = ({ departments, em
                     >
                       <FaUserEdit size={18} />
                     </button>
-                    <button className="text-red-600 hover:text-red-800 mx-1">
+                    {/* <button className="text-red-600 hover:text-red-800 mx-1">
                       <FaTrash size={18} />
-                    </button>
+                    </button> */}
                   </td>
                 </tr>
               ))

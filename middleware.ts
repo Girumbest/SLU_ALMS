@@ -29,9 +29,9 @@ export async function middleware(req: NextRequest) {
     return NextResponse.redirect(new URL('/unauthorized', req.url));
   }
 
-  if (pathname.startsWith('/supervisor') && token.role !== 'Supervisor') {
-    return NextResponse.redirect(new URL('/unauthorized', req.url));
-  }
+  // if (pathname.startsWith('/supervisor') && token.role !== 'Supervisor') {
+  //   return NextResponse.redirect(new URL('/unauthorized', req.url));
+  // }
 
   return NextResponse.next();
 }
