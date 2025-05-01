@@ -58,15 +58,13 @@ const LeaveRequestDetailTable: React.FC<EmployeeTableProps> = ({ departments, em
 
   const status = ["Pending", "Approved", "Rejected"];
   const [leaveTypes, setLeaveTypes] = useState<{ id: number; name: string }[]>([]);
-
+  
   useEffect(() => {
     const fetchData = async () => {
       const data = await getLeaveRequests(Number(empId));
       setFilteredLeaves(data.leaveRequests);
       setLeaves(data.leaveRequests)
       setLeaveTypes(data.leaveTypes);
-      console.log(data)
-      
       // setTotalPages(data.total);
     };
     fetchData();
