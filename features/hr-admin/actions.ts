@@ -787,6 +787,8 @@ export async function getAllAttendance(
   return { employee, total, settings };
 }
 
+
+//------------LEAVES-------------------------------
 export async function getLeaveRequests(empId?: number) {
   const leaveRequests = await prisma.leaveRequest.findMany({
     where: empId
@@ -881,7 +883,18 @@ export async function createLeaveRequest(
         errorMsg: "Please fill in all fields.",
       };
     }
-    const days = new Date(endDate).getDate() - new Date(startDate).getDate();
+
+    //-----------------------------------
+
+    //startDate and endDate
+    const start = new Date(startDate)
+    const end = new Date(endDate)
+
+    const leaveDays = await calculateLeaveDays(start, end);
+    //-----------------------------------
+
+    const days = leaveDays//new Date(endDate).getDate() - new Date(startDate).getDate();
+  
     if (days < 1) return { errorMsg: "End date must be after start date." };
     let leaveBalance = (
       await getLeaveBalance(Number(empId), Number(leaveTypeId))
@@ -935,10 +948,17 @@ export async function createLeaveRequest(
           status: "PENDING",
         },
       });
+      // AND: [
+      //   {
+      //     userId: Number(empId),
+      //   },
+      //   {
+      //     leaveTypeId: Number(leaveTypeId),
+      //   },
+      // ],
       await prisma.leaveBalance.update({
         where: {
-          userId: Number(empId),
-          leaveTypeId: Number(leaveTypeId),
+          id: leaveBalance.id,
         },
         data: {
           balance: leaveType.maxDays - days,
@@ -957,7 +977,71 @@ export async function createLeaveRequest(
     };
   }
 }
-
+export async function approveLeave(leaveId: number) {
+  try{
+    await prisma.leaveRequest.update({
+      where: {
+        id: leaveId,
+      },
+      data: {
+        status: "APPROVED",
+      },
+    });
+    revalidatePath("/admin/leave");
+    return { successMsg: "Leave request approved successfully!" };
+  }catch(error){
+    console.error("Error approving leave request:", error);
+    return {
+      errorMsg: "Failed to approve leave request.",
+    };
+  }
+}
+export async function rejectLeave(leaveId: number){
+  try{
+    const leave = await prisma.leaveRequest.findUnique({
+      where: {
+        id: leaveId,
+      },
+      select: {
+        userId: true,
+        leaveTypeId: true,
+        startDate: true,
+        endDate: true,
+      },
+    });
+    if(!leave) return {errorMsg: "Leave request not found."}
+    const leaveDays = await calculateLeaveDays(leave?.startDate as Date, leave?.endDate as Date);
+    await prisma.leaveBalance.update({
+      where: {
+        userId_leaveTypeId: {
+          userId: leave?.userId,
+          leaveTypeId: leave?.leaveTypeId,
+        },
+        },
+      data: {
+        balance: {
+          increment: leaveDays,
+        },
+      },
+    });
+    await prisma.leaveRequest.update({
+      where: {
+        id: leaveId,
+      },
+      data: {
+        status: "REJECTED",
+      },
+    });
+    revalidatePath("/admin/leave");
+    return { successMsg: "Leave request rejected successfully!" };
+  }catch(error){
+    console.error("Error rejecting leave request:", error);
+    return {
+      errorMsg: "Failed to reject leave request.",
+    };
+  }
+}
+//----------------------------LEAVES END-------------------------------
 //Not sure if i'm using this function somewhere(forgot why it's created!)
 async function getEmployeeAttendance(empId: number, date: Date) {
   if (!(await isWorkingDay(date))) {
@@ -1479,6 +1563,7 @@ function isSameDate(date1: Date, date2: Date): boolean {
   return date1.setHours(0, 0, 0, 0) === date2.setHours(0, 0, 0, 0);
 }
 
+//returns true if the date is not weekend and event date
 async function isWorkingDay(date?:Date) {
    //Weekend
    const testDate = date ? date : new Date()
@@ -1510,4 +1595,107 @@ async function isWorkingDay(date?:Date) {
   }
   //Work Day
   return true
+}
+
+export async function calculateLeaveDays(
+  startDate: Date,
+  endDate: Date,
+  // events: Event[]
+) {
+
+  const events = (await fetchEvents()).events;
+
+  // Make copies to avoid modifying original dates
+  const start = new Date(startDate);
+  const end = new Date(endDate);
+  
+  // Validate dates
+  if (start > end) return 0;
+
+  // Normalize dates by setting time to 00:00:00 to compare whole days
+  start.setHours(0, 0, 0, 0);
+  end.setHours(0, 0, 0, 0);
+
+  // Generate all event days (including recurring ones)
+  const allEventDays = generateAllEventDays(events, start, end);
+
+  let count = 0;
+  const current = new Date(start);
+
+  while (current <= end) {
+    const dayOfWeek = current.getDay();
+    const isWeekend = dayOfWeek === 0 || dayOfWeek === 6; // Sunday or Saturday
+    
+    // Check if current date is an event day (compare date strings)
+    const dateString = current.toISOString().split('T')[0];
+    const isEventDay = allEventDays.has(dateString);
+    
+    if (!isWeekend && !isEventDay) {
+      count++;
+    }
+    
+    current.setDate(current.getDate() + 1); // Move to next day
+  }
+
+  return count;
+}
+
+//helper function for calculateLeaveDays
+function generateAllEventDays(events: Event[], rangeStart: Date, rangeEnd: Date): Set<string> {
+  const eventDays = new Set<string>();
+
+  events.forEach(event => {
+    if (!event.isRecurring) {
+      // Add single non-recurring event
+      const date = new Date(event.eventDate);
+      date.setHours(0, 0, 0, 0);
+      if (date >= rangeStart && date <= rangeEnd) {
+        eventDays.add(date.toISOString().split('T')[0]);
+      }
+    } else if (event.recurringType && event.eventEnd) {
+      // Handle recurring events
+      const eventStart = new Date(event.eventDate);
+      eventStart.setHours(0, 0, 0, 0);
+      
+      const eventEnd = new Date(event.eventEnd);
+      eventEnd.setHours(0, 0, 0, 0);
+      
+      // Adjust to be within our calculation range
+      const start = eventStart < rangeStart ? rangeStart : eventStart;
+      const end = eventEnd > rangeEnd ? rangeEnd : eventEnd;
+
+      if (start > end) return;
+
+      const current = new Date(start);
+      const originalEventDate = new Date(event.eventDate);
+      originalEventDate.setHours(0, 0, 0, 0);
+
+      while (current <= end) {
+        if (isRecurringMatch(current, originalEventDate, event.recurringType)) {
+          eventDays.add(current.toISOString().split('T')[0]);
+        }
+        current.setDate(current.getDate() + 1);
+      }
+    }
+  });
+
+  return eventDays;
+}
+//helper function for generateAllEventDays
+function isRecurringMatch(currentDate: Date, originalDate: Date, type: string): boolean {
+  switch (type) {
+    case 'daily':
+      return true;
+    case 'weekly':
+      return currentDate.getDay() === originalDate.getDay();
+    case 'monthly':
+      return currentDate.getDate() === originalDate.getDate();
+    case 'yearly':
+      return (
+        currentDate.getMonth() === originalDate.getMonth() &&
+        currentDate.getDate() === originalDate.getDate()
+      );
+    default:
+      return false;
+  }
 }

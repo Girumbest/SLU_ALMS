@@ -17,6 +17,7 @@ const columns:TableColumn[] = [
 ];
 
 const AdminPage = () => {
+  // test()
   return <Table columns={columns} data={employeeData} uniqueId="id" />;
 };
 

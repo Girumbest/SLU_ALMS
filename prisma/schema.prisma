@@ -133,6 +133,7 @@ model LeaveBalance {
   leaveTypeId Int     
   user        User       @relation(fields: [userId], references: [id])
   leaveType   LeaveType  @relation(fields: [leaveTypeId], references: [id])
+  @@unique([userId, leaveTypeId]) // Composite unique index
 }
 
 model LeaveType {

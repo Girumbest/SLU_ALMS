@@ -6,6 +6,8 @@ import {
   FaTrash,
   FaEye,
   FaSearch,
+  FaThumbsUp,
+  FaThumbsDown,
 } from "react-icons/fa";
 import DateRangePicker from "./DateRangePicker";
 import { getEmployees, getLeaveRequests } from "@/features/hr-admin/actions";
@@ -80,6 +82,12 @@ const LeaveRequestTable: React.FC<EmployeeTableProps> = ({ departments }) => {
       });
     }
   };
+
+  const handleLeaveApprove = (leaveId: number) => {
+    
+  }
+  const handleLeaveReject = (leaveId: number) => {
+  }
 
   const handleFilterChange = (column: string, value: string) => {
     setFilters({ filterKey: column, searchValue: value });
@@ -387,15 +395,23 @@ const LeaveRequestTable: React.FC<EmployeeTableProps> = ({ departments }) => {
                     >
                       <FaEye size={18} />
                     </Link>
-                    <Link
-                      href={`./leave/edit/${leave.user.username}`}
-                      className="text-green-600 hover:text-green-800 mx-1"
-                    >
-                      <FaUserEdit size={18} />
-                    </Link>
-                    <button className="text-red-600 hover:text-red-800 mx-1">
-                      <FaTrash size={18} />
-                    </button>
+                    {leave.status.toLowerCase() === "pending" && (
+                      <>
+                        <button
+                          // href={`./leave/edit/${leave.user.username}`}
+                          className="text-green-600 hover:text-green-800 mx-1"
+                          title="Approve"
+                          onClick={e => handleLeaveApprove(leave.id)}
+                        >
+                          <FaThumbsUp size={18} />
+                        </button>
+                        <button title="Reject" className="text-red-600 hover:text-red-800 mx-1"
+                          onClick={e => handleLeaveReject(leave.id)}>
+                          <FaThumbsDown size={18} />
+                        </button>
+                      </>
+                    )}
+                    
                   </td>
                 </tr>
               ))
