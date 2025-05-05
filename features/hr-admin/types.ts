@@ -18,3 +18,10 @@ export interface Event {
     eventType: EventType;
     description: string | null;
   }
+
+ export interface Setting{  
+    key: string;    
+    value: any;    
+    type: string;     
+    description: string;
+}

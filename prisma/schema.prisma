@@ -141,7 +141,7 @@ model LeaveType {
   name        String
   description String?
   maxDays     Int
-  isReccuring Boolean @default(false)
+  accrued Boolean @default(false)
   createdAt               DateTime @default(now())
   updatedAt               DateTime? @updatedAt
   leaveRequests LeaveRequest[]

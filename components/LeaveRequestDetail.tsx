@@ -6,9 +6,14 @@ import {
   FaTrash,
   FaEye,
   FaSearch,
+  FaThumbsDown,
+  FaThumbsUp,
 } from "react-icons/fa";
 import DateRangePicker from "./DateRangePicker";
-import { getEmployees, getLeaveRequests } from "@/features/hr-admin/actions";
+import { approveLeave, getEmployees, getLeaveRequests, getSettings, rejectLeave } from "@/features/hr-admin/actions";
+import { useSession } from "next-auth/react";
+import { ClipLoader, PropagateLoader } from "react-spinners";
+import toast from "react-hot-toast";
 
 enum LeaveStatus {
   Pending = "Pending",
@@ -59,6 +64,14 @@ const LeaveRequestDetailTable: React.FC<EmployeeTableProps> = ({ departments, em
   const status = ["Pending", "Approved", "Rejected"];
   const [leaveTypes, setLeaveTypes] = useState<{ id: number; name: string }[]>([]);
   
+  const [isSupApprovalRequired, setIsSupApprovalRequired] = useState(false);
+  const [dataLoading, setDataLoading] = useState<boolean>(true)
+  const [actionLoading, setActionLoading] = useState<boolean>(false);
+  const [rejectActionLoading, setRejectActionLoading] = useState<boolean>(false);
+
+  const {data: session, status: sessionStatus} = useSession();
+
+
   useEffect(() => {
     const fetchData = async () => {
       const data = await getLeaveRequests(Number(empId));
@@ -66,6 +79,9 @@ const LeaveRequestDetailTable: React.FC<EmployeeTableProps> = ({ departments, em
       setLeaves(data.leaveRequests)
       setLeaveTypes(data.leaveTypes);
       // setTotalPages(data.total);
+      const settings = (await getSettings("supervisor_approval_required")).settings;
+      setIsSupApprovalRequired(settings?.value === "true");
+      setDataLoading(false);
     };
     fetchData();
   }, []);
@@ -80,6 +96,29 @@ const LeaveRequestDetailTable: React.FC<EmployeeTableProps> = ({ departments, em
       });
     }
   };
+  const handleLeaveApprove = async (leaveId: number) => {
+    setActionLoading(true);
+    const leaveApprove = await approveLeave(leaveId);
+    if(leaveApprove?.successMsg){
+      toast.success(leaveApprove.successMsg)
+      
+    }
+    if(leaveApprove?.errorMsg){
+      toast.error(leaveApprove.errorMsg)
+    }
+    setActionLoading(false);
+  }
+  const handleLeaveReject = async (leaveId: number) => {
+    setRejectActionLoading(true);
+    const leaveReject = await rejectLeave(leaveId);
+    if(leaveReject?.successMsg){
+      toast.success(leaveReject.successMsg)
+    }
+    if(leaveReject?.errorMsg){
+      toast.error(leaveReject.errorMsg)
+    }
+    setRejectActionLoading(false);
+  }
 
   const handleFilterChange = (column: string, value: string) => {
     setFilters({ filterKey: column, searchValue: value });
@@ -236,11 +275,11 @@ const LeaveRequestDetailTable: React.FC<EmployeeTableProps> = ({ departments, em
                       onChange={(e) =>
                         handleFilterChange("department", e.target.value)
                       }
+                      value={filters.filterKey === "department" ? filters.searchValue : ""}
                       className="w-full p-2 bg-white border border-gray-300 rounded focus:outline-none"
                     >
                       <option
                         value=""
-                        selected={filters.filterKey != "department"}
                       >
                         All
                       </option>
@@ -257,9 +296,10 @@ const LeaveRequestDetailTable: React.FC<EmployeeTableProps> = ({ departments, em
                       onChange={(e) =>
                         handleFilterChange("leaveType", e.target.value)
                       }
+                      value={filters.filterKey === "leaveType" ? filters.searchValue : ""}
                       className="w-full p-2 bg-white border border-gray-300 rounded focus:outline-none"
                     >
-                      <option value="" selected={filters.filterKey != "leaveType"}>
+                      <option value="">
                         All
                       </option>
                       {leaveTypes.map((type) => (
@@ -299,9 +339,10 @@ const LeaveRequestDetailTable: React.FC<EmployeeTableProps> = ({ departments, em
                       onChange={(e) =>
                         handleFilterChange("status", e.target.value)
                       }
+                      value={filters.filterKey === "status" ? filters.searchValue : ""}
                       className="w-full p-2 bg-white border border-gray-300 rounded focus:outline-none"
                     >
-                      <option value="" selected={filters.filterKey != "status"}>
+                      <option value="" >
                         All
                       </option>
                       {status.map((status) => (
@@ -406,22 +447,61 @@ const LeaveRequestDetailTable: React.FC<EmployeeTableProps> = ({ departments, em
                     >
                       <FaEye size={18} />
                     </Link>
-                    <Link
-                      href={`./leave/edit/${leave.user.username}`}
-                      className="text-green-600 hover:text-green-800 mx-1"
-                    >
-                      <FaUserEdit size={18} />
-                    </Link>
-                    <button className="text-red-600 hover:text-red-800 mx-1">
-                      <FaTrash size={18} />
-                    </button>
+                    {leave.status.toLowerCase() === "pending" && (
+                      <>
+                        <button
+                          // href={`./leave/edit/${leave.user.username}`}
+                          className="text-green-600 hover:text-green-800 mx-1"
+                          title="Approve"
+                          disabled={(session?.user.role === "Supervisor" && !isSupApprovalRequired) || (session?.user.role === "HRAdmin" && (isSupApprovalRequired && !leave?.isSupervisorApproved)) || actionLoading}
+                          onClick={e => handleLeaveApprove(leave.id)}
+                        >
+                          {!actionLoading && <FaThumbsUp size={18} />}
+                          <ClipLoader 
+                            loading={actionLoading}
+                            size={18}
+                            color="green"
+                            cssOverride={{
+                              display: 'block',
+                              margin: '0 auto',
+                            }}
+                          />
+                        </button>
+                        <button title="Reject" 
+                        className="text-red-600 hover:text-red-800 mx-1"
+                        disabled={(session?.user.role === "Supervisor" && !isSupApprovalRequired) || (session?.user.role === "HRAdmin" && (isSupApprovalRequired && !leave?.isSupervisorApproved)) || actionLoading}
+                          onClick={e => handleLeaveReject(leave.id)}>
+                          {!rejectActionLoading && <FaThumbsDown size={18} />}
+                          <ClipLoader 
+                            size={18}
+                            color="red"
+                            cssOverride={{
+                                display: 'block',
+                                margin: '0 auto',
+                            }}
+                            loading={rejectActionLoading}
+                          />
+                        </button>
+                      </>
+                    )}
                   </td>
                 </tr>
               ))
             ) : (
               <tr>
                 <td colSpan={10} className="p-5 text-center text-gray-500">
-                  No leave requests found.
+                {!dataLoading && <span>No leave requests found.</span>}
+                  <PropagateLoader 
+                    loading={dataLoading}
+                    color="#2563eb"
+                    cssOverride={{
+                      display: 'block',
+                      margin: '0 auto',
+                    }}
+                    size={15}
+                    aria-label="Loading Spinner"
+                    data-testid="loader"
+                />
                 </td>
               </tr>
             )}

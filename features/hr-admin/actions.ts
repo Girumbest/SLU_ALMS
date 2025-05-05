@@ -5,7 +5,7 @@ import path from "path";
 
 import { prisma } from "@/lib/db";
 import { departmentSchema, employeeEditSchema, employeeSchema } from "./schema";
-import { UserFormState, Event } from "./types";
+import { UserFormState, Event, Setting } from "./types";
 import { writeFile } from "fs/promises";
 import { generateUniqueFileName } from "@/utils/generate";
 import { revalidatePath } from "next/cache";
@@ -979,16 +979,71 @@ export async function createLeaveRequest(
 }
 export async function approveLeave(leaveId: number) {
   try{
-    await prisma.leaveRequest.update({
+    const user = (await session())?.user;
+    if(user?.role === "Employee"){
+      return {
+        errorMsg: "Validation failed.",
+      };
+    }
+    const isSupApprovalRequired = (await prisma.settings.findUnique({
+      where: {
+        key: "supervisor_approval_required"
+      },
+      select: {
+        value: true,
+        type: true,
+      }
+    }))?.value === "true";
+    const leave = await prisma.leaveRequest.findUnique({
       where: {
         id: leaveId,
       },
-      data: {
-        status: "APPROVED",
-      },
+      select: {
+        isApprovedByAdmin: true,
+        isApprovedBySupervisor: true,
+        userId: true,
+      }
     });
+
+    if(!leave) return {errorMsg: "Leave request not found."}
+
+    
+    if(user?.role === "Supervisor" && isSupApprovalRequired){
+      !leave.isApprovedBySupervisor &&
+      await prisma.leaveRequest.update({
+        where: {
+          id: leaveId,
+        },
+        data: {
+          status: "APPROVED",
+          isApprovedBySupervisor: true,
+        },
+      });
+    revalidatePath("/supervisor/leave");
+    return { successMsg: "Leave request approved successfully!" };
+    }
+
+    if(user?.role === "HRAdmin"){
+      if(isSupApprovalRequired && !leave.isApprovedBySupervisor){
+        return {
+          errorMsg: "Validation failed.",
+        };
+      }
+      !leave.isApprovedByAdmin &&
+      await prisma.leaveRequest.update({
+        where: {
+          id: leaveId,
+        },
+        data: {
+          status: "APPROVED",
+          isApprovedByAdmin: true,
+        },
+      });
     revalidatePath("/admin/leave");
     return { successMsg: "Leave request approved successfully!" };
+    }
+
+    return { errorMsg: "Validation failed."};
   }catch(error){
     console.error("Error approving leave request:", error);
     return {
@@ -996,8 +1051,30 @@ export async function approveLeave(leaveId: number) {
     };
   }
 }
+
 export async function rejectLeave(leaveId: number){
   try{
+
+    const user = (await session())?.user;
+    if(user?.role === "Employee"){
+      return {
+        errorMsg: "Validation failed.",
+      };
+    }
+    const isSupApprovalRequired = (await prisma.settings.findUnique({
+      where: {
+        key: "supervisor_approval_required"
+      },
+      select: {
+        value: true,
+        type: true,
+      }
+    }))?.value === "true";
+
+    if(user?.role === "Supervisor" && !isSupApprovalRequired){
+      return {errorMsg: "Validation failed."}
+    }
+
     const leave = await prisma.leaveRequest.findUnique({
       where: {
         id: leaveId,
@@ -1033,6 +1110,7 @@ export async function rejectLeave(leaveId: number){
       },
     });
     revalidatePath("/admin/leave");
+    revalidatePath("/supervisor/leave");
     return { successMsg: "Leave request rejected successfully!" };
   }catch(error){
     console.error("Error rejecting leave request:", error);
@@ -1443,6 +1521,94 @@ export async function deleteEvent(eventId: number) {
   }
 }
 
+export async function getSettings(key?: string) {
+  try {
+    if(!key){
+      const settings = await prisma.settings.findMany({
+        select: {
+          key: true,
+          value: true,
+          type: true,
+          description: true
+        },
+      });
+      return { settings };
+    }
+    const setting = await prisma.settings.findUnique({
+      where: {
+        key: key,
+      },
+      select: {
+        key: true,
+        value: true,
+        type: true,
+      },
+    });
+    return { setting };
+  } catch (error) {
+    console.error("Error fetching settings:", error);
+    return { errorMsg: "Error fetching settings" };
+  }
+}
+export async function saveSettings(newSettings: Setting[]) {
+  try {
+    const oldSettings = (await getSettings()).settings;
+    const updates: { key: string; value: string }[] = [];
+
+    newSettings.forEach((newSetting) => {
+      const oldSetting = oldSettings?.find(
+        (setting) => setting.key === newSetting.key
+      );
+
+      if (oldSetting) {
+        // Handle JSON values specially
+        if (newSetting.type === "JSON" && oldSetting.type === "JSON") {
+          try {
+            const newValue = JSON.parse(newSetting.value);
+            const oldValue = JSON.parse(oldSetting.value);
+            if (JSON.stringify(newValue) !== JSON.stringify(oldValue)) {
+              updates.push({
+                key: newSetting.key,
+                value: newSetting.value,
+              });
+            }
+          } catch (e) {
+            // If JSON parsing fails, fall back to string comparison
+            if (newSetting.value !== oldSetting.value) {
+              updates.push({
+                key: newSetting.key,
+                value: newSetting.value,
+              });
+            }
+          }
+        }
+        // Regular string comparison for non-JSON values
+        else if (newSetting.value !== oldSetting.value) {
+          updates.push({
+            key: newSetting.key,
+            value: newSetting.value,
+          });
+        }
+      }
+    });
+    console.log(updates);
+    await prisma.$transaction(
+      updates.map(update => 
+        prisma.settings.update({
+          where: { key: update.key },
+          data: {
+            value: update.value
+          }
+        })
+      )
+    );
+    revalidatePath("/admin/settings");
+    return {successMsg: "Settings saved successfully"}
+  } catch (error) {
+    console.error("Error saving settings:", error);
+    return { errorMsg: "Error saving settings" };
+  }
+}
 //----------------------------------------------------------------//
 
 const savePhoto = async (file: File): Promise<string> => {

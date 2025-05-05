@@ -41,11 +41,13 @@ const AdminSidebar = () => {
     const employeeMenu = ["/admin/employees", "/admin/employees/edit/", `/admin/employees/edit/${current}`, `/admin/employees/${current}`]
     const departmentMenu = ["/admin/departments", `/admin/departments/${current}`]
     const registerEmployee = "/admin/employees/new"
+    const leaveMenu = ["/admin/leave", `/admin/leave/${current}`]
     
     return (
      menuItem.name === "Employees" && employeeMenu.includes(pathname) && !employeeMenu.includes(registerEmployee) ||
      menuItem.name === "Departments" && departmentMenu.includes(pathname) ||
      menuItem.name === "Register Employee" && registerEmployee === pathname ||
+     menuItem.name === "Leave" && leaveMenu.includes(pathname) ||
      menuItem.path === pathname
     )
   };

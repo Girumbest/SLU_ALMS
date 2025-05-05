@@ -6,6 +6,7 @@ import DateRangePicker from "./DateRangePicker";
 import { getEmployeesAttendance } from "@/features/hr-admin/actions";
 import AttendanceEditModal from "./AttendanceEditModal";
 import toast from "react-hot-toast";
+import { PropagateLoader } from "react-spinners";
 
 interface AttendanceTime {
   morningCheckInTime: Date | null;
@@ -78,6 +79,7 @@ const AttendanceTable: React.FC<AttendanceTableProps> = ({ departments,supId }) 
   );
   const status = ["Absent", "Present", "On_Leave"];
   const [isWorkDay, setIsWorkDay] = useState<boolean>(true)
+  const [dataLoading, setDataLoading] = useState<boolean>(true)
 
 
   useEffect(() => {
@@ -106,9 +108,9 @@ const AttendanceTable: React.FC<AttendanceTableProps> = ({ departments,supId }) 
       setEmployeesAttendance(data.employees);
       setSettings(data.settings);
       setTotalPages(data.total);
-      console.log(data);
     };
     fetchData();
+    setDataLoading(false);
   }, [date, rerender]); //[filters, currentPage, date]);
 
   const handleDateRangeChange = (startDate: string, endDate: string) => {
@@ -245,7 +247,7 @@ const AttendanceTable: React.FC<AttendanceTableProps> = ({ departments,supId }) 
         <input
           className="border border-gray-300 rounded-md p-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent w-40"
           type="date"
-          // max={new Date().toISOString().split("T")[0]}
+          max={new Date().toISOString().split("T")[0]}
           defaultValue={date.toISOString().split("T")[0]}
           onChange={(e) => setDate(new Date(e.target.value))}
         />
@@ -560,7 +562,18 @@ const AttendanceTable: React.FC<AttendanceTableProps> = ({ departments,supId }) 
             (
               <tr>
                 <td colSpan={10} className="p-5 text-center text-gray-500">
-                  {!filters.filterKey && !isWorkDay ?"Today is not a work day.":"No employees found."}
+                  {!dataLoading && (!filters.filterKey && !isWorkDay ?"Today is not a work day.":"No employees found.")}
+                  <PropagateLoader 
+                    loading={dataLoading}
+                    color="#2563eb"
+                    cssOverride={{
+                      display: 'block',
+                      margin: '0 auto',
+                    }}
+                    size={15}
+                    aria-label="Loading Spinner"
+                    data-testid="loader"
+                />
                 </td>
               </tr>
             )}
