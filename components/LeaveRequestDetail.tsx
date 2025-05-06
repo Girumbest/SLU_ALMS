@@ -14,12 +14,7 @@ import { approveLeave, getEmployees, getLeaveRequests, getSettings, rejectLeave 
 import { useSession } from "next-auth/react";
 import { ClipLoader, PropagateLoader } from "react-spinners";
 import toast from "react-hot-toast";
-
-enum LeaveStatus {
-  Pending = "Pending",
-  Approved = "Approved",
-  Rejected = "Rejected",
-}
+import EmployeeSummary from "./EmployeeBriefInfo";
 
 interface LeaveRequest{
   id: number;
@@ -198,6 +193,9 @@ const LeaveRequestDetailTable: React.FC<EmployeeTableProps> = ({ departments, em
 
   return (
     <div className="max-w-7xl mx-auto bg-white shadow-lg rounded-lg p-6">
+      {/* Employee Info Card */}
+      
+      <EmployeeSummary empId={Number(empId)}/>
       <h2 className="text-2xl font-bold text-gray-800 mb-4">
         {"Leave Requests"}
       </h2>

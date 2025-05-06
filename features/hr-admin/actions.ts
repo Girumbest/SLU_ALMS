@@ -360,6 +360,33 @@ export async function getEmployees(
   return { employees, total };
 }
 
+export async function getEmployeeById(id:number){
+  const employees = await prisma.user.findUnique({
+    where:{
+      id
+    },
+    select:{
+      id: true,
+      firstName: true,
+      lastName: true,
+      username: true,
+      phoneNumber: true,
+      jobTitle: true,
+      department: {
+        select: {
+          name: true,
+        },
+      },
+      role: true,
+      salary: true,
+      hireDate: true,
+      photograph: true,
+    },
+    
+  })
+  return employees
+}
+
 export async function getDepartmentEmployees(
   departmentId: number,
   query = "",
@@ -840,10 +867,58 @@ export async function getLeaveTypes() {
       name: true,
       maxDays: true,
       description: true,
+      createdAt: true,
+      updatedAt: true,
     },
   });
   return { leaveTypes };
 }
+export async function addLeaveType(data:{
+  name: string,
+  description: string,
+  maxDays: number,
+  accrued?: boolean,
+}){
+  try{
+    console.log("NEW TYPE: ", data)
+    await prisma.leaveType.create({
+      data: data,
+    });
+    
+  }catch(error){
+    console.error("Error creating leave type:", error);
+    return {
+      errorMsg: "Failed to create leave type.",
+    };
+  }
+  revalidatePath("/admin/leave/leave-types");
+  return { successMsg: "Leave type created successfully!" };
+}
+export async function editLeaveType(data:{
+  id: number,
+  name: string,
+  description: string,
+  maxDays: number,
+  // accrued: boolean,
+}){
+  console.log("UPDATE TYPE DATA: ",data)
+  try{
+    await prisma.leaveType.update({
+      where: {
+        id: data.id,
+      },
+      data: data,
+    });
+    revalidatePath("/admin/leave/leave-types");
+    return {successMsg: "Leave type updated successfully!"}
+  }catch(error){
+    console.error("Error updating leave type:", error);
+    return {
+      errorMsg: "Failed to update leave type.",
+    };
+  }
+}
+
 export async function getLeaveBalance(empId: number, leaveTypeId: number) {
   const leaveBalance = await prisma.leaveBalance.findFirst({
     where: {

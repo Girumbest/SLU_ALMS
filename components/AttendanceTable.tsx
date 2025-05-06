@@ -342,9 +342,10 @@ const AttendanceTable: React.FC<AttendanceTableProps> = ({ departments,supId }) 
                       onChange={(e) =>
                         handleFilterChange("status", e.target.value)
                       }
+                      value={filters.filterKey === "status" ? filters.searchValue : ""}
                       className="w-full p-2 bg-white border border-gray-300 rounded focus:outline-none"
                     >
-                      <option value="" selected={filters.filterKey != "status"}>
+                      <option value="">
                         All
                       </option>
                       {status.map((status) => (

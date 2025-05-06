@@ -5,6 +5,8 @@ import { FaUserEdit, FaTrash, FaEye, FaSearch } from "react-icons/fa";
 import DateRangePicker from "./DateRangePicker";
 import { getAllAttendance, getEmployeesAttendance } from "@/features/hr-admin/actions";
 import AttendanceEditModal from "./AttendanceEditModal";
+import EmployeeSummary from "./EmployeeBriefInfo";
+import { PropagateLoader } from "react-spinners";
 
 interface AttendanceTime {
   morningCheckInTime: Date | null;
@@ -59,6 +61,8 @@ const AttendanceDetailTable: React.FC<AttendanceTableProps> = ({ departments, em
 
   const [date, setDate] = useState<Date>();
   const [rerender, setRerender] = useState(false);
+  const [dataLoading, setDataLoading] = useState<boolean>(true)
+
 
   const [currentPage, setCurrentPage] = useState(1);
   const attendancesPerPage = 5;
@@ -97,7 +101,7 @@ const AttendanceDetailTable: React.FC<AttendanceTableProps> = ({ departments, em
       // setEmployeesAttendance(data.employees);
       setSettings(data.settings);
       setTotalPages(data.total);
-      console.log(filteredAttendances);
+      setDataLoading(false);
     };
     fetchData();
   }, [date, filters, currentPage, rerender]); //[filters, currentPage, date]);
@@ -118,29 +122,7 @@ const AttendanceDetailTable: React.FC<AttendanceTableProps> = ({ departments, em
     console.log(searchKey)
     setSearchKey(column);
     setFilters({ filterKey: column, searchValue: value });
-    // if (column == "name") {
-    //   setFilteredAttendances(
-    //     employeesAttendance.filter(
-    //       (employee) =>
-    //         employee.firstName.toLowerCase().includes(value.toLowerCase()) ||
-    //         employee.lastName.toLowerCase().includes(value.toLowerCase())
-    //     )
-    //   );
-    // }
-    // if (column == "username") {
-    //   setFilteredAttendances(
-    //     employeesAttendance.filter((employee) =>
-    //       employee.username.toLowerCase().includes(value.toLowerCase())
-    //     )
-    //   );
-    // }
-    // if (column == "department") {
-    //   setFilteredAttendances(
-    //     employeesAttendance.filter((employee) =>
-    //       employee.department?.name.toLowerCase().includes(value.toLowerCase())
-    //     )
-    //   );
-    // }
+    
     if (column == "m-check-in") {
       setFilters({ filterKey: "morningCheckInTime", searchValue: value});
     }
@@ -164,8 +146,8 @@ const AttendanceDetailTable: React.FC<AttendanceTableProps> = ({ departments, em
 
   return (
     <div className="max-w-7xl mx-auto bg-white shadow-lg rounded-lg p-6">
+      <EmployeeSummary empId={Number(empId)}/>
       <h2 className="text-2xl font-bold text-gray-800 mb-4 flex items-center">
-        
         <span className="mr-3 text-gray-700">{`Attendances of Employee: ${employeeName}`}</span>
         {/* <input
           className="border border-gray-300 rounded-md p-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent w-40"
@@ -265,9 +247,10 @@ const AttendanceDetailTable: React.FC<AttendanceTableProps> = ({ departments, em
                       onChange={(e) =>
                         handleFilterChange("status", e.target.value)
                       }
+                      value={filters.filterKey === "status" ? filters.searchValue : ""}
                       className="w-full p-2 bg-white border border-gray-300 rounded focus:outline-none"
                     >
-                      <option value="" selected={filters.filterKey != "status"}>
+                      <option value="">
                         All
                       </option>
                       {status.map((status) => (
@@ -465,8 +448,22 @@ const AttendanceDetailTable: React.FC<AttendanceTableProps> = ({ departments, em
               ))
             ) : (
               <tr>
-                <td colSpan={10} className="p-5 text-center text-gray-500">
+                {/* <td colSpan={10} className="p-5 text-center text-gray-500">
                   No attendances found.
+                </td> */}
+                <td colSpan={10} className="p-5 text-center text-gray-500">
+                {!dataLoading && <span>No leave requests found.</span>}
+                  <PropagateLoader 
+                    loading={dataLoading}
+                    color="#2563eb"
+                    cssOverride={{
+                      display: 'block',
+                      margin: '0 auto',
+                    }}
+                    size={15}
+                    aria-label="Loading Spinner"
+                    data-testid="loader"
+                />
                 </td>
               </tr>
             )}

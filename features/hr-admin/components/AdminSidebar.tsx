@@ -28,6 +28,7 @@ const AdminSidebar = () => {
     { name: "Departments", icon: <FaSitemap />, path: "/admin/departments" },
     { name: "Attendance", icon: <FaCalendarCheck />, path: "/admin/attendance" },
     { name: "Leave", icon: <FaCalendarTimes />, path: "/admin/leave" },
+    { name: "Leave Types", icon: <FaCalendarTimes />, path: "/admin/leave/leave-types" },
     { name: "Calendar", icon: <FaCalendar />, path: "/admin/calendar" },
   ];
 
@@ -47,7 +48,8 @@ const AdminSidebar = () => {
      menuItem.name === "Employees" && employeeMenu.includes(pathname) && !employeeMenu.includes(registerEmployee) ||
      menuItem.name === "Departments" && departmentMenu.includes(pathname) ||
      menuItem.name === "Register Employee" && registerEmployee === pathname ||
-     menuItem.name === "Leave" && leaveMenu.includes(pathname) ||
+     menuItem.name === "Leave Types" && "/admin/leave/leave-types" === pathname ||
+     menuItem.name === "Leave" && pathname !== "/admin/leave/leave-types" &&  leaveMenu.includes(pathname) ||
      menuItem.path === pathname
     )
   };
