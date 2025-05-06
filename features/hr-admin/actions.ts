@@ -361,6 +361,7 @@ export async function getEmployees(
 }
 
 export async function getEmployeeById(id:number){
+  try{
   const employees = await prisma.user.findUnique({
     where:{
       id
@@ -374,6 +375,7 @@ export async function getEmployeeById(id:number){
       jobTitle: true,
       department: {
         select: {
+          id: true,
           name: true,
         },
       },
@@ -385,6 +387,10 @@ export async function getEmployeeById(id:number){
     
   })
   return employees
+}catch(error){
+  console.log(error)
+  
+}
 }
 
 export async function getDepartmentEmployees(

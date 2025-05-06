@@ -10,7 +10,7 @@ interface SidebarProps {
   setIsCollapsed: (collapsed: boolean) => void;
 }
 
-const AdminSidebar = () => {
+const SupervisorSidebar = () => {
   const router = useRouter();
   const [isProfileOpen, setIsProfileOpen] = useState(false);
   const [isCollapsed, setIsCollapsed ] = useState(false);
@@ -38,7 +38,7 @@ const AdminSidebar = () => {
 
   const isActive = (menuItem:{name:string, path:string, icon:any}) => {
     const current = pathname.split("/").pop();
-    const employeeMenu = ["/supervisor/employees", "/admin/employees/edit/", `/admin/employees/edit/${current}`, `/admin/employees/${current}`]
+    const employeeMenu = ["/supervisor/employees", "/admin/employees/edit/", `/admin/employees/edit/${current}`, `/supervisor/employees/${current}`]
     const departmentMenu = ["/admin/departments", `/admin/departments/${current}`]
     const registerEmployee = "/admin/employees/new"
     
@@ -46,6 +46,8 @@ const AdminSidebar = () => {
      menuItem.name === "Employees" && employeeMenu.includes(pathname) && !employeeMenu.includes(registerEmployee) ||
      menuItem.name === "Departments" && departmentMenu.includes(pathname) ||
      menuItem.name === "Register Employee" && registerEmployee === pathname ||
+     menuItem.name === "Attendance" && pathname === `/supervisor/attendance/${current}` ||
+     menuItem.name === "Leave" && pathname === `/supervisor/leave/${current}` ||
      menuItem.path === pathname
     )
   };
@@ -145,4 +147,4 @@ const AdminSidebar = () => {
   );
 };
 
-export default AdminSidebar;
+export default SupervisorSidebar;

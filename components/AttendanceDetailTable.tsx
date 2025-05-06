@@ -452,7 +452,7 @@ const AttendanceDetailTable: React.FC<AttendanceTableProps> = ({ departments, em
                   No attendances found.
                 </td> */}
                 <td colSpan={10} className="p-5 text-center text-gray-500">
-                {!dataLoading && <span>No leave requests found.</span>}
+                {!dataLoading && <span>No attendances found.</span>}
                   <PropagateLoader 
                     loading={dataLoading}
                     color="#2563eb"

@@ -9,6 +9,8 @@ import {
 } from "react-icons/fa";
 import DateRangePicker from "./DateRangePicker";
 import { getEmployees } from "@/features/hr-admin/actions";
+import { PropagateLoader } from "react-spinners";
+
 
 interface Employee {
   id: number;
@@ -43,6 +45,8 @@ const EmployeeTable: React.FC<EmployeeTableProps> = ({ departments }) => {
   const [totalResults, setTotalPages] = useState<number>(0);
   const [filteredEmployees, setFilteredEmployees] = useState<Employee[]>([]);
   const roles = ["Employee", "Supervisor"];
+  const [dataLoading, setDataLoading] = useState<boolean>(true)
+
 
   useEffect(() => {
     const fetchData = async () => {
@@ -54,6 +58,7 @@ const EmployeeTable: React.FC<EmployeeTableProps> = ({ departments }) => {
       );
       setFilteredEmployees(data.employees);
       setTotalPages(data.total);
+      setDataLoading(false)
     };
     fetchData();
   }, [filters, currentPage]);
@@ -148,11 +153,11 @@ const EmployeeTable: React.FC<EmployeeTableProps> = ({ departments }) => {
                       onChange={(e) =>
                         handleFilterChange("department", e.target.value)
                       }
+                      value={filters.filterKey === "department" ? filters.searchValue : ""}
                       className="w-full p-2 bg-white border border-gray-300 rounded focus:outline-none"
                     >
                       <option
                         value=""
-                        selected={filters.filterKey != "department"}
                       >
                         All
                       </option>
@@ -169,9 +174,10 @@ const EmployeeTable: React.FC<EmployeeTableProps> = ({ departments }) => {
                       onChange={(e) =>
                         handleFilterChange("role", e.target.value)
                       }
+                      value={filters.filterKey === "role" ? filters.searchValue : ""}
                       className="w-full p-2 bg-white border border-gray-300 rounded focus:outline-none"
                     >
-                      <option value="" selected={filters.filterKey != "role"}>
+                      <option value="" >
                         All
                       </option>
                       {roles.map((role) => (
@@ -255,16 +261,27 @@ const EmployeeTable: React.FC<EmployeeTableProps> = ({ departments }) => {
                     >
                       <FaUserEdit size={18} />
                     </Link>
-                    <button className="text-red-600 hover:text-red-800 mx-1">
+                    {/* <button className="text-red-600 hover:text-red-800 mx-1">
                       <FaTrash size={18} />
-                    </button>
+                    </button> */}
                   </td>
                 </tr>
               ))
             ) : (
               <tr>
                 <td colSpan={10} className="p-5 text-center text-gray-500">
-                  No employees found.
+                {!dataLoading && "No attendances found."}
+                  <PropagateLoader 
+                    loading={dataLoading}
+                    color="#2563eb"
+                    cssOverride={{
+                      display: 'block',
+                      margin: '0 auto',
+                    }}
+                    size={15}
+                    aria-label="Loading Spinner"
+                    data-testid="loader"
+                />
                 </td>
               </tr>
             )}

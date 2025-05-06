@@ -31,7 +31,8 @@ export const authOptions = {
             id: true,
             username: true,
             password: true,
-            role: true
+            role: true,
+            departmentId: true,
           }
         });
 
@@ -52,7 +53,8 @@ export const authOptions = {
         return {
           id: user.id.toString(),
           name: user.username,
-          role: user.role
+          role: user.role,
+          department: user.departmentId?.toString() || ''
         };
       }
     })
@@ -64,6 +66,7 @@ export const authOptions = {
         token.id = user.id;
         token.role = user.role;
         token.name = user.name;
+        token.department = user.department;
       }
       return token;
     },
@@ -73,6 +76,7 @@ export const authOptions = {
         session.user.id = token.id as string;
         session.user.role = token.role as string;
         session.user.name = token.name as string;
+        session.user.department = token.department as string;
       }
       return session;
     }

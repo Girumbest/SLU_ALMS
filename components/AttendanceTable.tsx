@@ -108,9 +108,10 @@ const AttendanceTable: React.FC<AttendanceTableProps> = ({ departments,supId }) 
       setEmployeesAttendance(data.employees);
       setSettings(data.settings);
       setTotalPages(data.total);
+    setDataLoading(false);
+
     };
     fetchData();
-    setDataLoading(false);
   }, [date, rerender]); //[filters, currentPage, date]);
 
   const handleDateRangeChange = (startDate: string, endDate: string) => {
@@ -533,12 +534,12 @@ const AttendanceTable: React.FC<AttendanceTableProps> = ({ departments,supId }) 
 
                   <td className="p-3 text-center flex">
                     <Link
-                      href={`/admin/attendance/${employee.id}`}
+                      href={supId ? `/supervisor/attendance/${employee.id}`:`/admin/attendance/${employee.id}`}
                       className="text-blue-600 hover:text-blue-800 mx-1"
                     >
                       <FaEye size={18} />
                     </Link>
-                    {(supId && Boolean(settings?.find(item => item.key === 'check_out_enabled')?.value!) || !supId) &&
+                    {(supId && settings?.find(item => item.key === 'check_out_enabled')?.value! === 'true' || !supId) &&
                     <button
                       // href={`./employees/edit/${employee.username}`}
                       disabled={employee.attendances[0]?.status === "ON_LEAVE"}
