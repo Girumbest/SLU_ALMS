@@ -389,7 +389,7 @@ export async function getEmployeeById(id:number){
   return employees
 }catch(error){
   console.log(error)
-  
+
 }
 }
 
@@ -822,13 +822,13 @@ export async function getAllAttendance(
 
 
 //------------LEAVES-------------------------------
-export async function getLeaveRequests(empId?: number) {
+export async function getLeaveRequests(empId?: number, depId?: number) {
   const leaveRequests = await prisma.leaveRequest.findMany({
     where: empId
       ? {
           userId: empId,
         }
-      : undefined,
+      : depId ? {user: { departmentId: depId } } : undefined,
     select: {
       id: true,
       startDate: true,

@@ -28,11 +28,11 @@ const SupervisorSidebar = () => {
     // { name: "Departments", icon: <FaSitemap />, path: "/admin/departments" },
     { name: "Attendance", icon: <FaCalendarCheck />, path: "/supervisor/attendance" },
     { name: "Leave", icon: <FaCalendarTimes />, path: "/supervisor/leave" },
-    { name: "Calendar", icon: <FaCalendar />, path: "/calendar" },
+    { name: "Calendar", icon: <FaCalendar />, path: "/supervisor/calendar" },
   ];
 
   const settingsMenu = [
-    { name: "Settings", icon: <FaCog />, path: "/admin/settings" },
+    // { name: "Settings", icon: <FaCog />, path: "/admin/settings" },
     { name: "Logout", icon: <FaSignOutAlt />, path: "#" },
   ];
 

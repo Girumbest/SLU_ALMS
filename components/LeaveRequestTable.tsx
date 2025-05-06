@@ -71,7 +71,8 @@ const LeaveRequestTable: React.FC<EmployeeTableProps> = ({ departments }) => {
   
   useEffect(() => {
     const fetchData = async () => {
-      const data = await getLeaveRequests();
+      const data = await getLeaveRequests(undefined, (session?.user?.role === "Supervisor" && session?.user?.department && Number(session?.user?.department)) || undefined);
+      // console.log(data);
       setFilteredLeaves(data.leaveRequests);
       setLeaves(data.leaveRequests)
       setLeaveTypes(data.leaveTypes);

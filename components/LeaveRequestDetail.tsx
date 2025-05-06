@@ -439,12 +439,12 @@ const LeaveRequestDetailTable: React.FC<EmployeeTableProps> = ({ departments, em
                   </td>
 
                   <td className="p-3 text-center flex">
-                    <Link
+                    {/* <Link
                       href={`./leave/${leave.user.username}`}
                       className="text-blue-600 hover:text-blue-800 mx-1"
                     >
                       <FaEye size={18} />
-                    </Link>
+                    </Link> */}
                     {leave.status.toLowerCase() === "pending" && (
                       <>
                         <button

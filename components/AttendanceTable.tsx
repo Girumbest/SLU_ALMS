@@ -102,6 +102,7 @@ const AttendanceTable: React.FC<AttendanceTableProps> = ({ departments,supId }) 
           setEmployeesAttendance([]);
         }
         toast.error(data.errorMsg)
+        setDataLoading(false);
         return
       }
       setFilteredEmployees(data.employees);
