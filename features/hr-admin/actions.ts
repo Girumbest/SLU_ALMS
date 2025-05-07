@@ -50,6 +50,20 @@ export async function createUser(
       errorMsg: `User ${existingUser.firstName} ${existingUser.lastName} has Username: ${data.username}`,
     };
 
+  //There should be only one supervisor per department
+  if(data.role === "Supervisor"){
+    const supervisor = await prisma.user.findFirst({
+      where: {
+        departmentId: data.department,
+        role: "Supervisor",
+      },
+      select: {
+        id: true,
+      },
+    })
+    if(supervisor) return {errorMsg: "Department already has a supervisor."}
+  }
+
   // Save to database
   await prisma.user.create({
     data: {
@@ -111,6 +125,20 @@ export async function editUser(
     return {
       errorMsg: `User ${existingUser?.firstName} ${existingUser?.lastName} has Username: ${data.username}`,
     };
+
+  //There should be only one supervisor per department
+  if(data.role === "Supervisor"){
+    const supervisor = await prisma.user.findFirst({
+      where: {
+        departmentId: data.department,
+        role: "Supervisor",
+      },
+      select: {
+        id: true,
+      },
+    })
+    if(supervisor?.id && supervisor.id != data.id) return {errorMsg: "Department already has a supervisor."}
+  }
 
   const updateData: any = {};
   //If the photo or cv have not been edited skip(photo or file update)
@@ -1946,3 +1974,5 @@ function isRecurringMatch(currentDate: Date, originalDate: Date, type: string): 
       return false;
   }
 }
+
+//=====================================REPORT=====================================

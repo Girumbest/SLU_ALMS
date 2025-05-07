@@ -1,9 +1,10 @@
 "use client";
 import Link from "next/link";
-import React, { useEffect, useState } from "react";
-import { FaUserEdit, FaTrash, FaEye, FaSearch } from "react-icons/fa";
+import React, { useEffect, useRef, useState } from "react";
+import { FaUserEdit, FaTrash, FaEye, FaSearch, FaFilePdf, FaPrint } from "react-icons/fa";
 import DateRangePicker from "./DateRangePicker";
-import { getEmployeesAttendance } from "@/features/hr-admin/actions";
+import { getEmployeesAttendance} from "@/features/hr-admin/actions";
+import { exportToCSV,printTable } from "@/features/hr-admin/utils";
 import AttendanceEditModal from "./AttendanceEditModal";
 import toast from "react-hot-toast";
 import { PropagateLoader } from "react-spinners";
@@ -242,6 +243,78 @@ const AttendanceTable: React.FC<AttendanceTableProps> = ({ departments,supId }) 
   const totalPages = Math.ceil(totalResults / employeesPerPage);
   const paginatedEmployees = filteredEmployees;
 
+  //==========================REPORT===========================
+  const tableRef = useRef<HTMLTableElement>(null);
+
+  // Add this near your other state declarations
+const [isGeneratingReport, setIsGeneratingReport] = useState(false);
+
+// Add these functions inside your component
+const generateCSVReport =  () => {
+  setIsGeneratingReport(true);
+  try {
+    const reportData = filteredEmployees.map(employee => {
+      const attendance = employee.attendances[0] || {};
+      return {
+        Name: `${employee.firstName} ${employee.lastName}`,
+        Username: employee.username,
+        Department: employee.department?.name || 'N/A',
+        'Morning Check-In': attendance.morningCheckInTime 
+          ? new Date(attendance.morningCheckInTime).toLocaleTimeString('en-US', {
+              hour: '2-digit', 
+              minute: '2-digit',
+              hour12: false,
+              timeZone: 'UTC'
+            })
+          : '-',
+        'Morning Check-Out': attendance.morningCheckOutTime 
+          ? new Date(attendance.morningCheckOutTime).toLocaleTimeString('en-US', {
+              hour: '2-digit', 
+              minute: '2-digit',
+              hour12: false,
+              timeZone: 'UTC'
+            })
+          : '-',
+        'Afternoon Check-In': attendance.afternoonCheckInTime 
+          ? new Date(attendance.afternoonCheckInTime).toLocaleTimeString('en-US', {
+              hour: '2-digit', 
+              minute: '2-digit',
+              hour12: false,
+              timeZone: 'UTC'
+            })
+          : '-',
+        'Afternoon Check-Out': attendance.afternoonCheckOutTime 
+          ? new Date(attendance.afternoonCheckOutTime).toLocaleTimeString('en-US', {
+              hour: '2-digit', 
+              minute: '2-digit',
+              hour12: false,
+              timeZone: 'UTC'
+            })
+          : '-',
+        Status: attendance.status 
+          ? attendance.status.charAt(0).toUpperCase() + attendance.status.slice(1).toLowerCase()
+          : employee?.leaveRequests?.length > 0 ? 'On Leave' : 'Absent',
+        'Late Morning': attendance.isLateMorningCheckIn ? 'Yes' : 'No',
+        'Early Morning': attendance.isEarlyMorningCheckOut ? 'Yes' : 'No',
+        'Late Afternoon': attendance.isLateAfternoonCheckIn ? 'Yes' : 'No',
+        'Early Afternoon': attendance.isEarlyAfternoonCheckOut ? 'Yes' : 'No'
+      };
+    });
+
+    exportToCSV(reportData, `Attendance_Report_${date.toISOString().split('T')[0]}`);
+  } catch (error) {
+    toast.error('Failed to generate report');
+    console.error(error);
+  } finally {
+    setIsGeneratingReport(false);
+  }
+};
+
+const handlePrint = () => {
+  printTable('attendance-table', `Attendance Report - ${date.toLocaleDateString()}`);
+};
+  //===========================================================
+
   return (
     <div className="max-w-7xl mx-auto bg-white shadow-lg rounded-lg p-6">
       <h2 className="text-2xl font-bold text-gray-800 mb-4 flex items-center">
@@ -256,10 +329,36 @@ const AttendanceTable: React.FC<AttendanceTableProps> = ({ departments,supId }) 
         <span className="ml-3 text-gray-600">
           {date.toLocaleDateString("en-US", { weekday: "long" })}
         </span>
+      {/* <Link href={""} className="ml-3 text-blue-600 hover:text-blue-800 text-sm font-semibold flex items-center"><FaFilePdf size={13}/>Generate Report</Link> */}
+      <div className="flex items-center">
+        <button
+          onClick={generateCSVReport}
+          disabled={isGeneratingReport || filteredEmployees.length === 0}
+          className="ml-3 text-blue-600 hover:text-blue-800 text-sm font-semibold flex items-center"
+        >
+          {isGeneratingReport ? (
+            <PropagateLoader color="#2563eb" size={8} />
+          ) : (
+            <>
+              <FaFilePdf size={13} className="mr-1" />
+              Export to CSV
+            </>
+          )}
+        </button>
+        
+        <button
+          onClick={handlePrint}
+          disabled={filteredEmployees.length === 0}
+          className="ml-3 text-blue-600 hover:text-blue-800 text-sm font-semibold flex items-center"
+        >
+          <FaPrint size={13} className="mr-1" />
+          Print Report
+        </button>
+      </div>
       </h2>
 
       <div className="overflow-x-auto">
-        <table className="w-full border-collapse">
+        <table ref={tableRef} id="attendance-table" className="w-full border-collapse">
           <thead>
             <tr className="bg-blue-600 text-white text-left">
               {[
@@ -387,7 +486,7 @@ const AttendanceTable: React.FC<AttendanceTableProps> = ({ departments,supId }) 
                         "/default-profile.png"
                       }
                       alt={`${employee.firstName} ${employee.lastName}`}
-                      className="w-12 h-12 object-cover rounded-full border-2 border-gray-300"
+                      className="w-12 h-12 object-cover rounded-full border-2 border-gray-300  "
                     />
                   </td>
 
