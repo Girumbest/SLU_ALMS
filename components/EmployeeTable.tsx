@@ -6,10 +6,14 @@ import {
   FaTrash,
   FaEye,
   FaSearch,
+  FaFilePdf,
+  FaPrint,
 } from "react-icons/fa";
 import DateRangePicker from "./DateRangePicker";
 import { getEmployees } from "@/features/hr-admin/actions";
-import { PropagateLoader } from "react-spinners";
+import { ClipLoader, PropagateLoader } from "react-spinners";
+import { exportToCSV, printTableEmployee } from "@/features/hr-admin/utils";
+import toast from "react-hot-toast";
 
 
 interface Employee {
@@ -32,7 +36,7 @@ interface EmployeeTableProps {
 
 const EmployeeTable: React.FC<EmployeeTableProps> = ({ departments }) => {
   const [currentPage, setCurrentPage] = useState(1);
-  const employeesPerPage = 10;
+  const [employeesPerPage,setEmployeesPerPage] = useState(10)
 
   const [filters, setFilters] = useState<{
     filterKey: string;
@@ -61,7 +65,7 @@ const EmployeeTable: React.FC<EmployeeTableProps> = ({ departments }) => {
       setDataLoading(false)
     };
     fetchData();
-  }, [filters, currentPage]);
+  }, [filters, currentPage,employeesPerPage]);
 
   const handleDateRangeChange = (startDate: string, endDate: string) => {
     if (!startDate && !endDate) {
@@ -80,17 +84,98 @@ const EmployeeTable: React.FC<EmployeeTableProps> = ({ departments }) => {
 
   const totalPages = Math.ceil(totalResults / employeesPerPage);
   const paginatedEmployees = filteredEmployees;
+//=============================REPORT=================================
+const [isGeneratingReport, setIsGeneratingReport] = useState(false);
+const [isPrinting, setIsPrinting] = useState(false)
 
+  // Add these functions inside your component
+  const generateCSVReport = async () => {
+    setIsGeneratingReport(true);
+    try {
+      const filteredEmpData: Employee[] = (await getEmployees(
+        filters.searchValue,
+        filters.filterKey,
+        totalResults,
+        currentPage
+      )).employees;
+      const reportData = filteredEmpData.map(employee => ({
+        Name: `${employee.firstName} ${employee.lastName}`,
+        Username: employee.username,
+        'Phone Number': employee.phoneNumber || 'N/A',
+        'Job Title': employee.jobTitle || 'N/A',
+        Department: employee.department?.name || 'N/A',
+        Role: employee.role,
+        Salary: employee.salary ? `$${employee.salary.toLocaleString()}` : 'N/A',
+        'Hire Date': employee.hireDate 
+          ? new Date(employee.hireDate).toLocaleDateString('en-GB', { 
+              day: '2-digit', 
+              month: 'short', 
+              year: 'numeric' 
+            })
+          : 'N/A'
+      }));
+      exportToCSV(reportData, `Employee_Report_${new Date().toISOString().split('T')[0]}`);
+    } catch (error) {
+      toast.error('Failed to generate report');
+      console.error('Failed to generate report', error);
+    } finally {
+      setIsGeneratingReport(false);
+    }
+  };
+
+  const handlePrint = () => {
+    if(employeesPerPage >= totalResults){
+      printTableEmployee('employee-table', `Employee Report - ${new Date().toLocaleDateString()}`);
+      return
+    }
+    setEmployeesPerPage(totalResults)
+    setIsPrinting(true)
+    setTimeout(() => {
+      printTableEmployee('employee-table', `Employee Report - ${new Date().toLocaleDateString()}`);
+      setEmployeesPerPage(employeesPerPage)
+      setIsPrinting(false)
+    }, 2000);
+  };
+
+//====================================================================
   return (
     <div className="max-w-7xl mx-auto bg-white shadow-lg rounded-lg p-6">
+      <div className="flex justify-between items-center mb-4">
       <h2 className="text-2xl font-bold text-gray-800 mb-4">
         {"Registered Employees"}
       </h2>
-
+      {/* REPORT */}
+      <div className="flex space-x-2">
+          <button
+            onClick={generateCSVReport}
+            disabled={isGeneratingReport || filteredEmployees.length === 0}
+            className="flex items-center px-3 py-1 bg-blue-600 text-white rounded hover:bg-blue-700 disabled:opacity-50 text-sm"
+          >
+            {isGeneratingReport ? (
+              <ClipLoader color="#ffffff" size={8} />
+            ) : (
+              <>
+                <FaFilePdf className="mr-1" size={14} />
+                Export CSV
+              </>
+            )}
+          </button>
+          <button
+            onClick={handlePrint}
+            disabled={filteredEmployees.length === 0 || isPrinting}
+            className="flex items-center px-3 py-1 bg-gray-600 text-white rounded hover:bg-gray-700 disabled:opacity-50 text-sm"
+          >
+            <FaPrint className="mr-1" size={14} />
+            {!isPrinting && "Print"}
+            <ClipLoader loading={isPrinting} color="#ffffff" size={8} />
+          </button>
+        </div>
+      </div>
+      {/* END */}
       <div className="overflow-x-auto">
-        <table className="w-full border-collapse">
+        <table id="employee-table" className="w-full border-collapse">
           <thead>
-            <tr className="bg-blue-600 text-white text-left">
+            <tr id='header-row' className="bg-blue-600 text-white text-left">
               {[
                 "Photo",
                 "Name",
@@ -109,7 +194,7 @@ const EmployeeTable: React.FC<EmployeeTableProps> = ({ departments }) => {
               ))}
             </tr>
 
-            <tr className="bg-gray-200">
+            <tr id="search-row" className="bg-gray-200">
               {[
                 "Photo",
                 "Name",
@@ -248,7 +333,7 @@ const EmployeeTable: React.FC<EmployeeTableProps> = ({ departments }) => {
                     </td>
                   ))}
 
-                  <td className="p-3 text-center flex">
+                  <td className="p-3 text-center flex action">
                     <Link
                       href={`./employees/${employee.username}`}
                       className="text-blue-600 hover:text-blue-800 mx-1"

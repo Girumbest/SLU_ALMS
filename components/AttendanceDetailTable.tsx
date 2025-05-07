@@ -65,7 +65,7 @@ const AttendanceDetailTable: React.FC<AttendanceTableProps> = ({ departments, em
 
 
   const [currentPage, setCurrentPage] = useState(1);
-  const attendancesPerPage = 5;
+  const attendancesPerPage = 5; //TODO: Check EmployeeTable for Report implementation!
 
   const [searchKey, setSearchKey] = useState<string>('') // used to reset filter search input
   const [filters, setFilters] = useState<{

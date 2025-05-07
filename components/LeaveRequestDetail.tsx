@@ -8,6 +8,8 @@ import {
   FaSearch,
   FaThumbsDown,
   FaThumbsUp,
+  FaPrint,
+  FaFilePdf,
 } from "react-icons/fa";
 import DateRangePicker from "./DateRangePicker";
 import { approveLeave, getEmployees, getLeaveRequests, getSettings, rejectLeave } from "@/features/hr-admin/actions";
@@ -15,6 +17,7 @@ import { useSession } from "next-auth/react";
 import { ClipLoader, PropagateLoader } from "react-spinners";
 import toast from "react-hot-toast";
 import EmployeeSummary from "./EmployeeBriefInfo";
+import { exportToCSV, printTable } from "@/features/hr-admin/utils";
 
 interface LeaveRequest{
   id: number;
@@ -42,7 +45,7 @@ interface EmployeeTableProps {
 
 const LeaveRequestDetailTable: React.FC<EmployeeTableProps> = ({ departments, empId }) => {
   const [currentPage, setCurrentPage] = useState(1);
-  const employeesPerPage = 5;
+  const [employeesPerPage, setEmployeesPerPage] = useState(10);
 
   const [filters, setFilters] = useState<{
     filterKey: string;
@@ -189,26 +192,110 @@ const LeaveRequestDetailTable: React.FC<EmployeeTableProps> = ({ departments, em
   
  }
   const totalPages = Math.ceil(filteredLeaves.length / employeesPerPage);
-  const paginatedEmployees = filteredLeaves;
+  const startIndex = (currentPage - 1) * employeesPerPage;
+  const paginatedEmployees = filteredLeaves.slice(startIndex, startIndex + employeesPerPage);
+//==============================REPORT==================================
+const [isGeneratingReport, setIsGeneratingReport] = useState(false);
+const [isPrinting, setIsPrinting] = useState(false)
 
+  // Add these functions inside your component
+  const generateCSVReport = () => {
+    setIsGeneratingReport(true);
+    try {
+      const reportData = filteredLeaves.map(leave => ({
+        'Employee Name': `${leave.user.firstName} ${leave.user.lastName}`,
+        Username: leave.user.username,
+        Department: leave.user.department?.name || 'N/A',
+        'Leave Type': leave.leaveType.name,
+        'Request Date': new Date(leave.createdAt).toLocaleDateString('en-GB', { 
+          day: '2-digit', 
+          month: 'short', 
+          year: 'numeric' 
+        }),
+        'Start Date': new Date(leave.startDate).toLocaleDateString('en-GB', { 
+          day: '2-digit', 
+          month: 'short', 
+          year: 'numeric' 
+        }),
+        'End Date': new Date(leave.endDate).toLocaleDateString('en-GB', { 
+          day: '2-digit', 
+          month: 'short', 
+          year: 'numeric' 
+        }),
+        'Total Days': Math.ceil((new Date(leave.endDate).getTime() - new Date(leave.startDate).getTime()) / (1000 * 3600 * 24)) + 1,
+        Reason: leave.reason,
+        Status: leave.status.charAt(0).toUpperCase() + leave.status.slice(1).toLowerCase(),
+        'Supervisor Approval': leave.isSupervisorApproved ? 'Approved' : 'Pending'
+      }));
+
+      exportToCSV(reportData, `Employee_Leave_Requests_${new Date().toISOString().split('T')[0]}`);
+    } catch (error) {
+      console.error('Failed to generate report', error);
+      toast.error('Failed to generate report');
+    } finally {
+      setIsGeneratingReport(false);
+    }
+  };
+
+  const handlePrint = () => {
+    if(employeesPerPage >= filteredLeaves.length){
+      printTable('leave-request-detail-table', `Employee Leave Requests - ${new Date().toLocaleDateString()}`);
+      return
+    }
+    setEmployeesPerPage(filteredLeaves.length)
+    setIsPrinting(true)
+    setTimeout(() => {
+      printTable('leave-request-detail-table', `Employee Leave Requests - ${new Date().toLocaleDateString()}`);
+      setEmployeesPerPage(employeesPerPage)
+      setIsPrinting(false)
+    }, 2000);
+  };
+//======================================================================
   return (
     <div className="max-w-7xl mx-auto bg-white shadow-lg rounded-lg p-6">
       {/* Employee Info Card */}
       
       <EmployeeSummary empId={Number(empId)}/>
-      <h2 className="text-2xl font-bold text-gray-800 mb-4">
-        {"Leave Requests"}
-      </h2>
+      <div className="flex justify-between items-center mb-4">
+        <h2 className="text-2xl font-bold text-gray-800">
+          Leave Requests
+        </h2>
+        <div className="flex space-x-2">
+          <button
+            onClick={generateCSVReport}
+            disabled={isGeneratingReport || filteredLeaves.length === 0}
+            className="flex items-center px-3 py-1 bg-blue-600 text-white rounded hover:bg-blue-700 disabled:opacity-50 text-sm"
+          >
+            {isGeneratingReport ? (
+              <ClipLoader color="#ffffff" size={14} />
+            ) : (
+              <>
+                <FaFilePdf className="mr-1" size={14} />
+                Export CSV
+              </>
+            )}
+          </button>
+          <button
+            onClick={handlePrint}
+            disabled={filteredLeaves.length === 0 || isPrinting}
+            className="flex items-center px-3 py-1 bg-gray-600 text-white rounded hover:bg-gray-700 disabled:opacity-50 text-sm"
+          >
+            <FaPrint className="mr-1" size={14} />
+            {!isPrinting && "Print"}
+            <ClipLoader loading={isPrinting} color="#ffffff" size={8} />
+          </button>
+        </div>
+      </div>
 
       <div className="overflow-x-auto">
-        <table className="w-full border-collapse">
+        <table id="leave-request-detail-table" className="w-full border-collapse">
           <thead>
-            <tr className="bg-blue-600 text-white text-left">
+            <tr id='header-row' className="bg-blue-600 text-white text-left">
               {[
-                "Photo",
-                "Name",
-                "Username",
-                "Department",
+                // "Photo",
+                // "Name",
+                // "Username",
+                // "Department",
                 "Leave Type",
                 "Created At",
                 "Start Date",
@@ -224,12 +311,12 @@ const LeaveRequestDetailTable: React.FC<EmployeeTableProps> = ({ departments, em
               ))}
             </tr>
 
-            <tr className="bg-gray-200">
+            <tr id="search-row" className="bg-gray-200">
               {[
-                "Photo",
-                "Name",
-                "Username",
-                "Department",
+                // "Photo",
+                // "Name",
+                // "Username",
+                // "Department",
                 "Leave Type",
                 "Created At",
                 "Start Date",
@@ -365,7 +452,7 @@ const LeaveRequestDetailTable: React.FC<EmployeeTableProps> = ({ departments, em
                     index % 2 === 0 ? "bg-gray-100" : "bg-white"
                   } hover:bg-gray-200`}
                 >
-                  <td className="p-3">
+                  {/* <td className="p-3">
                     <img
                       suppressHydrationWarning
                       src={
@@ -379,10 +466,10 @@ const LeaveRequestDetailTable: React.FC<EmployeeTableProps> = ({ departments, em
 
                   <td className="p-3 font-semibold text-gray-900 whitespace-nowrap">
                     {leave.user.firstName} {leave.user.lastName}
-                  </td>
+                  </td> */}
                   {[
-                    "username",
-                    "department",
+                    // "username",
+                    // "department",
                     "leaveType",
                     "createdAt",
                     "startDate",
@@ -438,7 +525,7 @@ const LeaveRequestDetailTable: React.FC<EmployeeTableProps> = ({ departments, em
                     )}
                   </td>
 
-                  <td className="p-3 text-center flex">
+                  <td className="p-3 text-center flex action">
                     {/* <Link
                       href={`./leave/${leave.user.username}`}
                       className="text-blue-600 hover:text-blue-800 mx-1"

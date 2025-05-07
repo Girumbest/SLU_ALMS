@@ -554,7 +554,7 @@ export async function getDepartmentEmployees(
 export async function getEmployeesAttendance(
   query = "",
   searchBy: string,
-  employeesPerPage = 10,
+  employeesPerPage?: number,
   page = 1,
   date = new Date(),
   supId?: number
@@ -593,8 +593,8 @@ export async function getEmployeesAttendance(
 
 
   const employees = await prisma.user.findMany({
-    skip: (page - 1) * employeesPerPage,
-    take: employeesPerPage,
+    skip: employeesPerPage ? (page - 1) * employeesPerPage : undefined,
+    take: employeesPerPage || undefined,
     where: {
       departmentId: supervisor ? supervisor?.department?.id : undefined,
     },

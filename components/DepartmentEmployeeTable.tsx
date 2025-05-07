@@ -1,11 +1,12 @@
 "use client";
 import Link from "next/link";
 import React, { useEffect, useState } from "react";
-import { FaUserEdit, FaTrash, FaEye, FaSearch } from "react-icons/fa";
+import { FaUserEdit, FaTrash, FaEye, FaSearch, FaFilePdf, FaPrint } from "react-icons/fa";
 import DateRangePicker from "./DateRangePicker";
 import { getDepartmentEmployees } from "@/features/hr-admin/actions";
-import { PropagateLoader } from "react-spinners";
+import { ClipLoader, PropagateLoader } from "react-spinners";
 import { useSession } from "next-auth/react";
+import { exportToCSV, printTableDepartmentEmployees } from "@/features/hr-admin/utils";
 
 interface Employee {
   id: number;
@@ -31,7 +32,7 @@ const DepartmentEmployeeTable: React.FC<EmployeeTableProps> = ({
   depName,
 }) => {
   const [currentPage, setCurrentPage] = useState(1);
-  const employeesPerPage = 5;
+  const [employeesPerPage,setEmployeesPerPage] = useState(5)
 
   const [filters, setFilters] = useState<{
     filterKey: string;
@@ -62,7 +63,7 @@ const DepartmentEmployeeTable: React.FC<EmployeeTableProps> = ({
       setDataLoading(false)
     };
     fetchData();
-  }, [filters, currentPage, depId]);
+  }, [filters, currentPage, depId, employeesPerPage]);
 
   const handleDateRangeChange = (startDate: string, endDate: string) => {
     if (!startDate && !endDate) {
@@ -81,18 +82,98 @@ const DepartmentEmployeeTable: React.FC<EmployeeTableProps> = ({
 
   const totalPages = Math.ceil(totalResults / employeesPerPage);
   const paginatedEmployees = filteredEmployees;
+//==========================REPORT=======================
+const [isGeneratingReport, setIsGeneratingReport] = useState(false);
+const [isPrinting, setIsPrinting] = useState(false)
 
+  // Add these functions inside your component
+  const generateCSVReport = async() => {
+    setIsGeneratingReport(true);
+    try {
+      const data: Employee[] = (await getDepartmentEmployees(
+        depId,
+        filters.searchValue,
+        filters.filterKey,
+        totalResults,
+        currentPage
+      )).employees;
+      const reportData = data.map(employee => ({
+        Name: `${employee.firstName} ${employee.lastName}`,
+        Username: employee.username,
+        'Phone Number': employee.phoneNumber || 'N/A',
+        'Job Title': employee.jobTitle || 'N/A',
+        Department: depName,
+        Salary: employee.salary ? `$${employee.salary.toLocaleString()}` : 'N/A',
+        'Hire Date': employee.hireDate 
+          ? new Date(employee.hireDate).toLocaleDateString('en-GB', { 
+              day: '2-digit', 
+              month: 'short', 
+              year: 'numeric' 
+            })
+          : 'N/A'
+      }));
+
+      exportToCSV(reportData, `${depName.replace(/\s+/g, '_')}_Employees_${new Date().toISOString().split('T')[0]}`);
+    } catch (error) {
+      console.error('Failed to generate report', error);
+    } finally {
+      setIsGeneratingReport(false);
+    }
+  };
+
+  const handlePrint = () => {
+    if(employeesPerPage >= totalResults){
+      printTableDepartmentEmployees('department-employee-table', `${depName} Employees - ${new Date().toLocaleDateString()}`);
+      return
+    }
+    setEmployeesPerPage(totalResults)
+    setIsPrinting(true)
+    setTimeout(() => {
+      printTableDepartmentEmployees('department-employee-table', `${depName} Employees - ${new Date().toLocaleDateString()}`);
+      setEmployeesPerPage(employeesPerPage)
+      setIsPrinting(false)
+    }, 2000);
+  };
+//=======================================================
   return (
     <div className="max-w-7xl mx-auto bg-white shadow-lg rounded-lg p-6">
-      <h2 className="text-2xl font-bold text-gray-800 mb-4">
-        {`${depName} Employees List`}
-        {session?.user?.role === "Supervisor" &&<span className="ml-3 text-gray-600">Total: {totalResults}</span>}
-      </h2>
+      <div className="flex justify-between items-center mb-4">
+        <h2 className="text-2xl font-bold text-gray-800">
+          {`${depName} Employees List`}
+          {session?.user?.role === "Supervisor" && <span className="ml-3 text-gray-600">Total: {totalResults}</span>}
+        </h2>
+        {/* REPORT */}
+        <div className="flex space-x-2">
+          <button
+            onClick={generateCSVReport}
+            disabled={isGeneratingReport || filteredEmployees.length === 0}
+            className="flex items-center px-3 py-1 bg-blue-600 text-white rounded hover:bg-blue-700 disabled:opacity-50 text-sm"
+          >
+            {isGeneratingReport ? (
+              <ClipLoader color="#ffffff" size={8} />
+            ) : (
+              <>
+                <FaFilePdf className="mr-1" size={14} />
+                Export CSV
+              </>
+            )}
+          </button>
+          <button
+            onClick={handlePrint}
+            disabled={filteredEmployees.length === 0}
+            className="flex items-center px-3 py-1 bg-gray-600 text-white rounded hover:bg-gray-700 disabled:opacity-50 text-sm"
+          >
+            <FaPrint className="mr-1" size={14} />
+            {!isPrinting && "Print"}
+            <ClipLoader loading={isPrinting} color="#ffffff" size={8} />
+          </button>
+        </div>
+      </div>
 
       <div className="overflow-x-auto">
-        <table className="w-full border-collapse">
+        <table id="department-employee-table" className="w-full border-collapse">
           <thead>
-            <tr className="bg-blue-600 text-white text-left">
+            <tr id='header-row' className="bg-blue-600 text-white text-left">
               {[
                 "Photo",
                 "Name",
@@ -109,7 +190,7 @@ const DepartmentEmployeeTable: React.FC<EmployeeTableProps> = ({
               ))}
             </tr>
 
-            <tr className="bg-gray-200">
+            <tr id="search-row" className="bg-gray-200">
               {[
                 "Photo",
                 "Name",
@@ -200,7 +281,7 @@ const DepartmentEmployeeTable: React.FC<EmployeeTableProps> = ({
                     </td>
                   ))}
 
-                  <td className="p-3 text-center flex">
+                  <td className="p-3 text-center flex action">
                     <Link
                       href={session?.user?.role === "HRAdmin" ? `/admin/employees/${employee.username}`: `/supervisor/employees/${employee.username}`}
                       className="text-blue-600 hover:text-blue-800 mx-1"

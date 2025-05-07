@@ -7,7 +7,7 @@ import { getEmployeesAttendance} from "@/features/hr-admin/actions";
 import { exportToCSV,printTable } from "@/features/hr-admin/utils";
 import AttendanceEditModal from "./AttendanceEditModal";
 import toast from "react-hot-toast";
-import { PropagateLoader } from "react-spinners";
+import { ClipLoader, PropagateLoader } from "react-spinners";
 
 interface AttendanceTime {
   morningCheckInTime: Date | null;
@@ -63,7 +63,8 @@ const AttendanceTable: React.FC<AttendanceTableProps> = ({ departments,supId }) 
   const [rerender, setRerender] = useState(false);
 
   const [currentPage, setCurrentPage] = useState(1);
-  const employeesPerPage = 5;
+  const [employeesPerPage, setEmployeesPerPage] = useState(10)
+  // const employeesPerPage = 5;
 
   const [filters, setFilters] = useState<{
     filterKey: string;
@@ -73,7 +74,7 @@ const AttendanceTable: React.FC<AttendanceTableProps> = ({ departments,supId }) 
     searchValue: "",
   });
 
-  const [totalResults, setTotalPages] = useState<number>(0);
+  const [totalResults, setTotalResults] = useState<number>(0);
   const [filteredEmployees, setFilteredEmployees] = useState<Employee[]>([]);
   const [employeesAttendance, setEmployeesAttendance] = useState<Employee[]>(
     []
@@ -91,7 +92,7 @@ const AttendanceTable: React.FC<AttendanceTableProps> = ({ departments,supId }) 
         // filters.searchValue,
         "",
         filters.filterKey,
-        employeesPerPage,
+        undefined,
         currentPage,
         date,
         supId
@@ -109,7 +110,7 @@ const AttendanceTable: React.FC<AttendanceTableProps> = ({ departments,supId }) 
       setFilteredEmployees(data.employees);
       setEmployeesAttendance(data.employees);
       setSettings(data.settings);
-      setTotalPages(data.total);
+      setTotalResults(data.total);
     setDataLoading(false);
 
     };
@@ -144,6 +145,7 @@ const AttendanceTable: React.FC<AttendanceTableProps> = ({ departments,supId }) 
           employee.username.toLowerCase().includes(value.toLowerCase())
         )
       );
+      setTotalResults(filteredEmployees.length)
     }
     if (column == "department") {
       setFilteredEmployees(
@@ -240,14 +242,18 @@ const AttendanceTable: React.FC<AttendanceTableProps> = ({ departments,supId }) 
 
   };
 
-  const totalPages = Math.ceil(totalResults / employeesPerPage);
-  const paginatedEmployees = filteredEmployees;
+  const totalPages = Math.ceil(filteredEmployees.length / employeesPerPage);
+  const startIndex = (currentPage - 1) * employeesPerPage;
+  const paginatedEmployees = filteredEmployees.slice(startIndex, startIndex + employeesPerPage)
+
+
 
   //==========================REPORT===========================
   const tableRef = useRef<HTMLTableElement>(null);
 
   // Add this near your other state declarations
 const [isGeneratingReport, setIsGeneratingReport] = useState(false);
+const [isPrinting, setIsPrinting] = useState(false)
 
 // Add these functions inside your component
 const generateCSVReport =  () => {
@@ -311,12 +317,23 @@ const generateCSVReport =  () => {
 };
 
 const handlePrint = () => {
-  printTable('attendance-table', `Attendance Report - ${date.toLocaleDateString()}`);
+  if(employeesPerPage >= filteredEmployees.length){
+    printTable('attendance-table', `Attendance Report - ${date.toLocaleDateString()}`);
+    return
+  }
+  setEmployeesPerPage(filteredEmployees.length)
+  setIsPrinting(true)
+  setTimeout(() => {
+    printTable('attendance-table', `Attendance Report - ${date.toLocaleDateString()}`);
+    setEmployeesPerPage(employeesPerPage)
+    setIsPrinting(false)
+  }, 2000);
 };
   //===========================================================
 
   return (
     <div className="max-w-7xl mx-auto bg-white shadow-lg rounded-lg p-6">
+      <div className="flex justify-between items-center mb-4">
       <h2 className="text-2xl font-bold text-gray-800 mb-4 flex items-center">
         <span className="mr-3 text-gray-700">Employee Attendances for</span>
         <input
@@ -329,38 +346,40 @@ const handlePrint = () => {
         <span className="ml-3 text-gray-600">
           {date.toLocaleDateString("en-US", { weekday: "long" })}
         </span>
-      {/* <Link href={""} className="ml-3 text-blue-600 hover:text-blue-800 text-sm font-semibold flex items-center"><FaFilePdf size={13}/>Generate Report</Link> */}
-      <div className="flex items-center">
-        <button
-          onClick={generateCSVReport}
-          disabled={isGeneratingReport || filteredEmployees.length === 0}
-          className="ml-3 text-blue-600 hover:text-blue-800 text-sm font-semibold flex items-center"
-        >
-          {isGeneratingReport ? (
-            <PropagateLoader color="#2563eb" size={8} />
-          ) : (
-            <>
-              <FaFilePdf size={13} className="mr-1" />
-              Export to CSV
-            </>
-          )}
-        </button>
-        
-        <button
-          onClick={handlePrint}
-          disabled={filteredEmployees.length === 0}
-          className="ml-3 text-blue-600 hover:text-blue-800 text-sm font-semibold flex items-center"
-        >
-          <FaPrint size={13} className="mr-1" />
-          Print Report
-        </button>
-      </div>
+      
       </h2>
-
+      {/* REPORT */}
+      <div className="flex space-x-2">
+          <button
+            onClick={generateCSVReport}
+            disabled={isGeneratingReport || filteredEmployees.length === 0}
+            className="flex items-center px-3 py-1 bg-blue-600 text-white rounded hover:bg-blue-700 disabled:opacity-50 text-sm"
+          >
+            {isGeneratingReport ? (
+              <ClipLoader color="#ffffff" size={8} />
+            ) : (
+              <>
+                <FaFilePdf className="mr-1" size={14} />
+                Export CSV
+              </>
+            )}
+          </button>
+          <button
+            onClick={handlePrint}
+            disabled={filteredEmployees.length === 0 || isPrinting}
+            className="flex items-center px-3 py-1 bg-gray-600 text-white rounded hover:bg-gray-700 disabled:opacity-50 text-sm"
+          >
+            <FaPrint className="mr-1" size={14} />
+            {!isPrinting && "Print"}
+            <ClipLoader loading={isPrinting} color="#ffffff" size={8} />
+          </button>
+        </div>
+      </div>
+      {/* END */}
       <div className="overflow-x-auto">
         <table ref={tableRef} id="attendance-table" className="w-full border-collapse">
           <thead>
-            <tr className="bg-blue-600 text-white text-left">
+            <tr id='header-row' className="bg-blue-600 text-white text-left">
               {[
                 "Photo",
                 "Name",
@@ -379,7 +398,7 @@ const handlePrint = () => {
               ))}
             </tr>
 
-            <tr className="bg-gray-200">
+            <tr id="search-row" className="bg-gray-200">
               {[
                 "Photo",
                 "Name",
@@ -632,7 +651,7 @@ const handlePrint = () => {
                     )}
                   </td>
 
-                  <td className="p-3 text-center flex">
+                  <td className="p-3 text-center flex action">
                     <Link
                       href={supId ? `/supervisor/attendance/${employee.id}`:`/admin/attendance/${employee.id}`}
                       className="text-blue-600 hover:text-blue-800 mx-1"
