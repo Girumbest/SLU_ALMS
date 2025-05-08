@@ -1,12 +1,14 @@
 "use client";
 import Link from "next/link";
 import React, { useEffect, useState } from "react";
-import { FaUserEdit, FaTrash, FaEye, FaSearch } from "react-icons/fa";
+import { FaUserEdit, FaTrash, FaEye, FaSearch, FaPrint, FaFilePdf } from "react-icons/fa";
 import DateRangePicker from "./DateRangePicker";
 import { getAllAttendance, getEmployeesAttendance } from "@/features/hr-admin/actions";
 import AttendanceEditModal from "./AttendanceEditModal";
 import EmployeeSummary from "./EmployeeBriefInfo";
-import { PropagateLoader } from "react-spinners";
+import { ClipLoader, PropagateLoader } from "react-spinners";
+import { exportToCSV, printTable } from "@/features/hr-admin/utils";
+import toast from "react-hot-toast";
 
 interface AttendanceTime {
   morningCheckInTime: Date | null;
@@ -65,7 +67,7 @@ const AttendanceDetailTable: React.FC<AttendanceTableProps> = ({ departments, em
 
 
   const [currentPage, setCurrentPage] = useState(1);
-  const attendancesPerPage = 5; //TODO: Check EmployeeTable for Report implementation!
+  const [attendancesPerPage, setAttendancesPerPage] = useState(10);
 
   const [searchKey, setSearchKey] = useState<string>('') // used to reset filter search input
   const [filters, setFilters] = useState<{
@@ -86,7 +88,6 @@ const AttendanceDetailTable: React.FC<AttendanceTableProps> = ({ departments, em
   
   useEffect(() => {
     // setFilters({ filterKey: "", searchValue: "" });
-    setCurrentPage(1);
     const fetchData = async () => {
       const data = await getAllAttendance(
         Number(empId),
@@ -104,7 +105,7 @@ const AttendanceDetailTable: React.FC<AttendanceTableProps> = ({ departments, em
       setDataLoading(false);
     };
     fetchData();
-  }, [date, filters, currentPage, rerender]); //[filters, currentPage, date]);
+  }, [ date, filters, currentPage, rerender, attendancesPerPage]); //[filters, currentPage, date]);
 
   const handleDateRangeChange = (startDate: string, endDate: string) => {
     if (!startDate && !endDate) {
@@ -144,27 +145,123 @@ const AttendanceDetailTable: React.FC<AttendanceTableProps> = ({ departments, em
   const totalPages = Math.ceil(totalResults / attendancesPerPage);
   const paginatedEmployees = filteredAttendances;
 
+  //=============================REPORT=================================
+  const [isGeneratingReport, setIsGeneratingReport] = useState(false);
+  const [isPrinting, setIsPrinting] = useState(false)
+
+  // Add these functions inside your component
+  const generateCSVReport = async () => {
+    setIsGeneratingReport(true);
+    try {
+      const data = await getAllAttendance(
+        Number(empId),
+        filters.searchValue,
+        filters.filterKey,
+        totalResults,
+        currentPage,
+        // date
+      );
+      const reportData = data.employee?.attendances.map(attendance => ({
+        Date: attendance.date.toDateString(),
+        'Morning Check-In': attendance.morningCheckInTime 
+          ? new Date(attendance.morningCheckInTime).toLocaleTimeString('en-US', {
+              hour: '2-digit', 
+              minute: '2-digit',
+              hour12: false,
+              timeZone: 'UTC'
+            }) + (attendance.isLateMorningCheckIn ? ' (Late)' : ' (On Time)')
+          : '-',
+        'Morning Check-Out': attendance.morningCheckOutTime 
+          ? new Date(attendance.morningCheckOutTime).toLocaleTimeString('en-US', {
+              hour: '2-digit', 
+              minute: '2-digit',
+              hour12: false,
+              timeZone: 'UTC'
+            }) + (attendance.isEarlyMorningCheckOut ? ' (Early)' : ' (On Time)')
+          : attendance.checkOutEnabled ? '-' : 'N/A',
+        'Afternoon Check-In': attendance.afternoonCheckInTime 
+          ? new Date(attendance.afternoonCheckInTime).toLocaleTimeString('en-US', {
+              hour: '2-digit', 
+              minute: '2-digit',
+              hour12: false,
+              timeZone: 'UTC'
+            }) + (attendance.isLateAfternoonCheckIn ? ' (Late)' : ' (On Time)')
+          : '-',
+        'Afternoon Check-Out': attendance.afternoonCheckOutTime 
+          ? new Date(attendance.afternoonCheckOutTime).toLocaleTimeString('en-US', {
+              hour: '2-digit', 
+              minute: '2-digit',
+              hour12: false,
+              timeZone: 'UTC'
+            }) + (attendance.isEarlyAfternoonCheckOut ? ' (Early)' : ' (On Time)')
+          : attendance.checkOutEnabled ? '-' : 'N/A',
+        Status: attendance.status 
+          ? attendance.status.charAt(0).toUpperCase() + attendance.status.slice(1).toLowerCase()
+          : 'Absent'
+      }));
+
+      exportToCSV(reportData, `${employeeName?.replace(/\s+/g, '_')}_Attendance_${new Date().toISOString().split('T')[0]}`);
+    } catch (error) {
+      console.error('Failed to generate report', error);
+      toast.error('Failed to generate report');
+    } finally {
+      setIsGeneratingReport(false);
+    }
+  };
+
+  const handlePrint = () => {
+    if(attendancesPerPage >= totalResults){
+      printTable('attendance-detail-table', `${employeeName} Attendance - ${new Date().toLocaleDateString()}`);
+      return
+    }
+    setAttendancesPerPage(totalResults)
+    setIsPrinting(true)
+    setTimeout(() => {
+      printTable('attendance-detail-table', `${employeeName} Attendance - ${new Date().toLocaleDateString()}`);
+      setAttendancesPerPage(attendancesPerPage)
+      setIsPrinting(false)
+    }, 2000);
+  };
+  //====================================================================
+
   return (
     <div className="max-w-7xl mx-auto bg-white shadow-lg rounded-lg p-6">
       <EmployeeSummary empId={Number(empId)}/>
-      <h2 className="text-2xl font-bold text-gray-800 mb-4 flex items-center">
-        <span className="mr-3 text-gray-700">{`Attendances of Employee: ${employeeName}`}</span>
-        {/* <input
-          className="border border-gray-300 rounded-md p-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent w-40"
-          type="date"
-          max={new Date().toISOString().split("T")[0]}
-          defaultValue={date?.toISOString().split("T")[0]}
-          onChange={(e) => setDate(new Date(e.target.value))}
-        />
-        <span className="ml-3 text-gray-600">
-          {date?.toLocaleDateString("en-US", { weekday: "long" })}
-        </span> */}
-      </h2>
+      <div className="flex justify-between items-center mb-4">
+        <h2 className="text-2xl font-bold text-gray-800">
+          {`Attendances of Employee: ${employeeName}`}
+        </h2>
+        <div className="flex space-x-2">
+        <button
+            onClick={generateCSVReport}
+            disabled={isGeneratingReport || filteredAttendances.length === 0}
+            className="flex items-center px-3 py-1 bg-blue-600 text-white rounded hover:bg-blue-700 disabled:opacity-50 text-sm"
+          >
+            {isGeneratingReport ? (
+              <ClipLoader color="#ffffff" size={8} />
+            ) : (
+              <>
+                <FaFilePdf className="mr-1" size={14} />
+                Export CSV
+              </>
+            )}
+          </button>
+          <button
+            onClick={handlePrint}
+            disabled={filteredAttendances.length === 0 || isPrinting}
+            className="flex items-center px-3 py-1 bg-gray-600 text-white rounded hover:bg-gray-700 disabled:opacity-50 text-sm"
+          >
+            <FaPrint className="mr-1" size={14} />
+            {!isPrinting && "Print"}
+            <ClipLoader loading={isPrinting} color="#ffffff" size={8} />
+          </button>
+        </div>
+      </div>
 
       <div className="overflow-x-auto">
-        <table className="w-full border-collapse">
+        <table id="attendance-detail-table" className="w-full border-collapse">
           <thead>
-            <tr className="bg-blue-600 text-white text-left">
+            <tr id='header-row' className="bg-blue-600 text-white text-left">
               {[
                 "Date",
                 "M-Check-In",
@@ -180,7 +277,7 @@ const AttendanceDetailTable: React.FC<AttendanceTableProps> = ({ departments, em
               ))}
             </tr>
 
-            <tr className="bg-gray-200">
+            <tr id="search-row" className="bg-gray-200">
               {[
                 "Date",
                 "M-Check-In",
@@ -421,7 +518,7 @@ const AttendanceDetailTable: React.FC<AttendanceTableProps> = ({ departments, em
                     )}
                   </td>
 
-                  <td className="p-3 text-center flex">
+                  <td className="p-3 text-center flex action">
                     {/* <Link
                       href={`./employees/${""}`}
                       className="text-blue-600 hover:text-blue-800 mx-1"

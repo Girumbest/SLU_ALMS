@@ -1,6 +1,6 @@
 "use client";
 import Link from "next/link";
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useMemo, useState } from "react";
 import {
   FaUserEdit,
   FaTrash,
@@ -230,12 +230,13 @@ const [isPrinting, setIsPrinting] = useState(false)
       printTable('leave-request-table', `Leave Requests - ${new Date().toLocaleDateString()}`);
       return
     }
-    setEmployeesPerPage(filteredLeaves.length)
-    setIsPrinting(true)
+    const originalEmployeesPerPage = employeesPerPage; // Store the original value
+    setEmployeesPerPage(filteredLeaves.length);
+    setIsPrinting(true);
     setTimeout(() => {
       printTable('leave-request-table', `Leave Requests - ${new Date().toLocaleDateString()}`);
-      setEmployeesPerPage(employeesPerPage)
-      setIsPrinting(false)
+      setEmployeesPerPage(originalEmployeesPerPage); // Restore the original value
+      setIsPrinting(false);
     }, 2000);
   };
 

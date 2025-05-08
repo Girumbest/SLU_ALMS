@@ -32,7 +32,7 @@ const DepartmentEmployeeTable: React.FC<EmployeeTableProps> = ({
   depName,
 }) => {
   const [currentPage, setCurrentPage] = useState(1);
-  const [employeesPerPage,setEmployeesPerPage] = useState(5)
+  const [employeesPerPage,setEmployeesPerPage] = useState(10)
 
   const [filters, setFilters] = useState<{
     filterKey: string;
@@ -81,7 +81,7 @@ const DepartmentEmployeeTable: React.FC<EmployeeTableProps> = ({
   };
 
   const totalPages = Math.ceil(totalResults / employeesPerPage);
-  const paginatedEmployees = filteredEmployees;
+  const paginatedEmployees = filteredEmployees; //No Pagination for this table
 //==========================REPORT=======================
 const [isGeneratingReport, setIsGeneratingReport] = useState(false);
 const [isPrinting, setIsPrinting] = useState(false)

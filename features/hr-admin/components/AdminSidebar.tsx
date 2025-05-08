@@ -17,7 +17,7 @@ const AdminSidebar = () => {
   const pathname = usePathname();
 
   const mainMenu = [
-    { name: "Dashboard", icon: <FaHome />, path: "/admin/dashboard" },
+    { name: "Dashboard", icon: <FaHome />, path: "/admin" },
     // { name: "Employees", icon: <FaUsers />, path: "/admin/employees" },
     // { name: "Departments", icon: <FaBuilding />, path: "/admin/departments" },
   ];
@@ -42,12 +42,14 @@ const AdminSidebar = () => {
     const employeeMenu = ["/admin/employees", "/admin/employees/edit/", `/admin/employees/edit/${current}`, `/admin/employees/${current}`]
     const departmentMenu = ["/admin/departments", `/admin/departments/${current}`]
     const registerEmployee = "/admin/employees/new"
+    const attendanceMenu = ["/admin/attendance", `/admin/attendance/${current}`]
     const leaveMenu = ["/admin/leave", `/admin/leave/${current}`]
     
     return (
      menuItem.name === "Employees" && employeeMenu.includes(pathname) && !employeeMenu.includes(registerEmployee) ||
      menuItem.name === "Departments" && departmentMenu.includes(pathname) ||
      menuItem.name === "Register Employee" && registerEmployee === pathname ||
+     menuItem.name === "Attendance" && attendanceMenu.includes(pathname) ||
      menuItem.name === "Leave Types" && "/admin/leave/leave-types" === pathname ||
      menuItem.name === "Leave" && pathname !== "/admin/leave/leave-types" &&  leaveMenu.includes(pathname) ||
      menuItem.path === pathname
