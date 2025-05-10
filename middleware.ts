@@ -14,11 +14,11 @@ export async function middleware(req: NextRequest) {
   // Public routes
   if (pathname.startsWith('/login')) {
     if (token) {
-      return NextResponse.redirect(new URL('/dashboard', req.url));
+      const redirectPath = token.role === "HRAdmin" ? "/admin" : token.role === "Supervisor" ? "/supervisor" : "/"
+      return NextResponse.redirect(new URL(redirectPath, req.url));
     }
     return NextResponse.next();
   }
-
   // Protected routes
   if (!token) {
     return NextResponse.redirect(new URL('/login', req.url));
@@ -35,7 +35,20 @@ export async function middleware(req: NextRequest) {
 
   return NextResponse.next();
 }
-
 export const config = {
-  matcher: ['/admin/:path*', '/supervisor/:path*', '/dashboard/:path*', '/api/:path*'],
+  matcher: [
+    /*
+     * Match all request paths except for:
+     * - _next/static (static files)
+     * - _next/image (image optimization files)
+     * - favicon.ico (favicon file)
+     * - login page
+     * - public assets (if any)
+     */
+    '/((?!_next/static|_next/image|favicon.ico|login).*)',
+  ],
 };
+
+// export const config = {
+//   matcher: ['/admin/:path*', '/supervisor/:path*', '/dashboard/:path*', '/api/:path*'],
+// };
