@@ -30,6 +30,7 @@ model User {
   jobTitle                String?  // Job title of the user
   role                    Role      @default(Employee)
   positionLevel           String?  // Position level (e.g., Junior, Senior)
+  faceDescriptor          Float[]
   photograph              String  // URL or path to the user's photograph
   salary                  Float?   // Salary of the user
   educationalLevel        String?  // Educational level (e.g., Bachelor's, Master's)

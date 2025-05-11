@@ -12,16 +12,100 @@ import { revalidatePath } from "next/cache";
 import { RecurringType } from "@prisma/client";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
+import * as faceapi from 'face-api.js';
+
 
 async function session() {
   //Logged-in User session
   return await getServerSession(authOptions);
 }
 
+// export async function createUser(
+//   prevState: UserFormState,
+//   formData: FormData
+// ): Promise<UserFormState> {
+//   const rawData = Object.fromEntries(formData.entries());
+//   const validatedData = employeeSchema.safeParse(rawData);
+
+//   if (!validatedData.success) {
+//     return {
+//       errorMsg: "Validation failed",
+//       errors: validatedData.error.flatten().fieldErrors,
+//     };
+//   }
+//   let data = validatedData.data;
+//   // console.log(data);
+  
+//   //Check for existence of a user with the same username
+//   const existingUser = await prisma.user.findUnique({
+//     where: {
+//       username: data.username,
+//     },
+//     select: {
+//       firstName: true,
+//       lastName: true,
+//     },
+//   });
+
+//   if (!!existingUser)
+//     return {
+//       errorMsg: `User ${existingUser.firstName} ${existingUser.lastName} has Username: ${data.username}`,
+//     };
+
+//   //There should be only one supervisor per department
+//   if(data.role === "Supervisor"){
+//     const supervisor = await prisma.user.findFirst({
+//       where: {
+//         departmentId: data.department,
+//         role: "Supervisor",
+//       },
+//       select: {
+//         id: true,
+//       },
+//     })
+//     if(supervisor) return {errorMsg: "Department already has a supervisor."}
+//   }
+
+//   // Save to database
+//   await prisma.user.create({
+//     data: {
+//       firstName: data.firstName,
+//       lastName: data.lastName,
+//       username: data.username,
+//       password: data.password,
+//       address: data.address,
+//       dateOfBirth: new Date(data.dateOfBirth),
+//       gender: data.gender,
+//       phoneNumber: data.phoneNumber,
+//       emergencyContactPhone: data.emergencyContactPhone,
+//       hireDate: new Date(data.hireDate),
+//       jobTitle: data.jobTitle,
+//       salary: data.salary,
+//       positionLevel: data.positionLevel,
+//       educationalLevel: data.educationalLevel,
+//       directDepositInfo: data.directDepositInfo,
+//       maritalStatus: data.maritalStatus,
+//       departmentId: data.department,
+//       role: data.role,
+
+//       photograph: await savePhoto(data.photograph), //returns photos filename
+//       cv: (data.cv || undefined) && (await saveCV(data.cv as File)),
+//     },
+//   });
+
+//   return { successMsg: "Form submitted successfully!" };
+// }
+
 export async function createUser(
   prevState: UserFormState,
   formData: FormData
 ): Promise<UserFormState> {
+  // First, load face-api.js models (should be done once at application startup)
+  // You might want to move this to a separate initialization function
+  await faceapi.nets.tinyFaceDetector.loadFromUri('/models');
+  await faceapi.nets.faceLandmark68Net.loadFromUri('/models');
+  await faceapi.nets.faceRecognitionNet.loadFromUri('/models');
+
   const rawData = Object.fromEntries(formData.entries());
   const validatedData = employeeSchema.safeParse(rawData);
 
@@ -31,10 +115,10 @@ export async function createUser(
       errors: validatedData.error.flatten().fieldErrors,
     };
   }
-  let data = validatedData.data;
-  // console.log(data);
   
-  //Check for existence of a user with the same username
+  let data = validatedData.data;
+  
+  // Check for existence of a user with the same username
   const existingUser = await prisma.user.findUnique({
     where: {
       username: data.username,
@@ -50,7 +134,7 @@ export async function createUser(
       errorMsg: `User ${existingUser.firstName} ${existingUser.lastName} has Username: ${data.username}`,
     };
 
-  //There should be only one supervisor per department
+  // There should be only one supervisor per department
   if(data.role === "Supervisor"){
     const supervisor = await prisma.user.findFirst({
       where: {
@@ -62,6 +146,35 @@ export async function createUser(
       },
     })
     if(supervisor) return {errorMsg: "Department already has a supervisor."}
+  }
+
+  // Process the photograph for face detection
+  const photographFile = data.photograph as File;
+  let faceDescriptor: number[] | null = null;
+
+  try {
+    // Convert the File to an HTMLImageElement
+    const img = await loadImageFromFile(photographFile);
+    
+    // Detect faces in the image
+    const detections = await faceapi
+      .detectAllFaces(img, new faceapi.TinyFaceDetectorOptions())
+      .withFaceLandmarks()
+      .withFaceDescriptors();
+    
+    // Check if exactly one face is detected
+    if (detections.length === 0) {
+      return { errorMsg: "No face detected in the photograph. Please upload a clear photo with one visible face." };
+    }
+    if (detections.length > 1) {
+      return { errorMsg: "Multiple faces detected in the photograph. Please upload a photo with only one visible face." };
+    }
+    
+    // Get the face descriptor (convert Float32Array to regular array for storage)
+    faceDescriptor = Array.from(detections[0].descriptor);
+  } catch (error) {
+    console.error('Face detection error:', error);
+    return { errorMsg: "Error processing face detection. Please try again with a different photo." };
   }
 
   // Save to database
@@ -85,19 +198,25 @@ export async function createUser(
       maritalStatus: data.maritalStatus,
       departmentId: data.department,
       role: data.role,
-
-      photograph: await savePhoto(data.photograph),
+      faceDescriptor: faceDescriptor,
+      photograph: await savePhoto(photographFile), //returns photos filename
       cv: (data.cv || undefined) && (await saveCV(data.cv as File)),
     },
   });
 
-  return { successMsg: "Form submitted successfully!" };
+  return { successMsg: "User created successfully with facial recognition data!" };
 }
 
 export async function editUser(
   prevState: UserFormState,
   formData: FormData
 ): Promise<UserFormState> {
+  // Load face-api.js models if not already loaded
+  // In a production app, you should load these once at startup
+  await faceapi.nets.tinyFaceDetector.loadFromUri('/models');
+  await faceapi.nets.faceLandmark68Net.loadFromUri('/models');
+  await faceapi.nets.faceRecognitionNet.loadFromUri('/models');
+
   const rawData = Object.fromEntries(formData.entries());
   const validatedData = employeeEditSchema.safeParse(rawData);
 
@@ -109,7 +228,7 @@ export async function editUser(
   }
   let data = validatedData.data;
 
-  //Check for existence of a user with the same username
+  // Check for existence of a user with the same username
   const existingUser = await prisma.user.findUnique({
     where: {
       username: data.username,
@@ -126,7 +245,7 @@ export async function editUser(
       errorMsg: `User ${existingUser?.firstName} ${existingUser?.lastName} has Username: ${data.username}`,
     };
 
-  //There should be only one supervisor per department
+  // There should be only one supervisor per department
   if(data.role === "Supervisor"){
     const supervisor = await prisma.user.findFirst({
       where: {
@@ -141,9 +260,39 @@ export async function editUser(
   }
 
   const updateData: any = {};
-  //If the photo or cv have not been edited skip(photo or file update)
+  
+  // Process photograph if provided
+  if (data.photograph) {
+    try {
+      const photographFile = data.photograph as File;
+      const img = await loadImageFromFile(photographFile);
+      
+      // Detect faces in the image
+      const detections = await faceapi
+        .detectAllFaces(img, new faceapi.TinyFaceDetectorOptions())
+        .withFaceLandmarks()
+        .withFaceDescriptors();
+      
+      // Validate face detection
+      if (detections.length === 0) {
+        return { errorMsg: "No face detected in the new photograph. Please upload a clear photo with one visible face." };
+      }
+      if (detections.length > 1) {
+        return { errorMsg: "Multiple faces detected in the new photograph. Please upload a photo with only one visible face." };
+      }
+      
+      // Update both the photograph and face descriptor
+      updateData.photograph = await savePhoto(photographFile);
+      updateData.faceDescriptor = Array.from(detections[0].descriptor);
+    } catch (error) {
+      console.error('Face detection error:', error);
+      return { errorMsg: "Error processing face detection in the new photo. Please try again with a different photo." };
+    }
+  }
+
+  // Handle other fields
   for (let [field, value] of Object.entries(data)) {
-    if (field == "id") continue;
+    if (field == "id" || field == "photograph") continue;
 
     if (field == "dateOfBirth") {
       updateData.dateOfBirth = new Date(value as string);
@@ -157,11 +306,6 @@ export async function editUser(
       updateData.departmentId = value;
       continue;
     }
-
-    if (field == "photograph") {
-      value && (updateData.photograph = await savePhoto(value as File));
-      continue;
-    }
     if (field == "cv") {
       value && (updateData.cv = await saveCV(value as File));
       continue;
@@ -169,8 +313,7 @@ export async function editUser(
 
     updateData[field] = value;
   }
-  // console.log("UPDATE DATA: ", updateData);
-  // return {successMsg: "RECEIVED AT TEST POINT"}
+
   // Save to database
   await prisma.user.update({
     where: {
@@ -178,8 +321,120 @@ export async function editUser(
     },
     data: updateData,
   });
-  return { successMsg: "User updated successfully!" };
+
+  return { 
+    successMsg: data.photograph 
+      ? "User updated successfully with new facial recognition data!" 
+      : "User updated successfully!" 
+  };
 }
+
+// Helper function to load an image from a File object
+async function loadImageFromFile(file: File): Promise<HTMLImageElement> {
+  return new Promise((resolve, reject) => {
+    const img = new Image();
+    const url = URL.createObjectURL(file);
+    
+    img.onload = () => {
+      URL.revokeObjectURL(url);
+      resolve(img);
+    };
+    
+    img.onerror = () => {
+      URL.revokeObjectURL(url);
+      reject(new Error('Failed to load image'));
+    };
+    
+    img.src = url;
+  });
+}
+
+// export async function editUser(
+//   prevState: UserFormState,
+//   formData: FormData
+// ): Promise<UserFormState> {
+//   const rawData = Object.fromEntries(formData.entries());
+//   const validatedData = employeeEditSchema.safeParse(rawData);
+
+//   if (!validatedData.success) {
+//     return {
+//       errorMsg: "Validation failed",
+//       errors: validatedData.error.flatten().fieldErrors,
+//     };
+//   }
+//   let data = validatedData.data;
+
+//   //Check for existence of a user with the same username
+//   const existingUser = await prisma.user.findUnique({
+//     where: {
+//       username: data.username,
+//     },
+//     select: {
+//       id: true,
+//       firstName: true,
+//       lastName: true,
+//     },
+//   });
+
+//   if (existingUser?.id != data.id)
+//     return {
+//       errorMsg: `User ${existingUser?.firstName} ${existingUser?.lastName} has Username: ${data.username}`,
+//     };
+
+//   //There should be only one supervisor per department
+//   if(data.role === "Supervisor"){
+//     const supervisor = await prisma.user.findFirst({
+//       where: {
+//         departmentId: data.department,
+//         role: "Supervisor",
+//       },
+//       select: {
+//         id: true,
+//       },
+//     })
+//     if(supervisor?.id && supervisor.id != data.id) return {errorMsg: "Department already has a supervisor."}
+//   }
+
+//   const updateData: any = {};
+//   //If the photo or cv have not been edited skip(photo or file update)
+//   for (let [field, value] of Object.entries(data)) {
+//     if (field == "id") continue;
+
+//     if (field == "dateOfBirth") {
+//       updateData.dateOfBirth = new Date(value as string);
+//       continue;
+//     }
+//     if (field == "hireDate") {
+//       updateData.hireDate = new Date(value as string);
+//       continue;
+//     }
+//     if (field == "department") {
+//       updateData.departmentId = value;
+//       continue;
+//     }
+
+//     if (field == "photograph") {
+//       value && (updateData.photograph = await savePhoto(value as File));
+//       continue;
+//     }
+//     if (field == "cv") {
+//       value && (updateData.cv = await saveCV(value as File));
+//       continue;
+//     }
+
+//     updateData[field] = value;
+//   }
+//   // console.log("UPDATE DATA: ", updateData);
+//   // return {successMsg: "RECEIVED AT TEST POINT"}
+//   // Save to database
+//   await prisma.user.update({
+//     where: {
+//       id: data.id,
+//     },
+//     data: updateData,
+//   });
+//   return { successMsg: "User updated successfully!" };
+// }
 
 export async function createDepartment(
   prevState: UserFormState,
