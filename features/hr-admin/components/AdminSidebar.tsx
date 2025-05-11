@@ -9,6 +9,7 @@ import { useRouter, usePathname } from "next/navigation";
 import Image from "next/image";
 import { signOut, useSession } from 'next-auth/react';
 import Link from "next/link";
+import { ClipLoader } from "react-spinners";
 
 interface MenuItem {
   name: string;
@@ -27,6 +28,7 @@ const AdminSidebar = () => {
   const id = session?.user?.id;
   const pathname = usePathname();
   const chevronRefs = useRef<Record<string, HTMLSpanElement | null>>({});
+  // const [loading, setLoading] = useState(false)
 
   const menus: MenuItem[] = [
     { name: "Dashboard", icon: <FaHome />, path: "/admin" },
@@ -136,14 +138,15 @@ const AdminSidebar = () => {
       return (
         <React.Fragment key={item.name}>
           <div
-            className={`flex items-center p-3 transition-all 
+            className={`flex items-center p-3 transition-all cursor-pointer
               ${isActive(item) ? "bg-blue-600" : "hover:bg-gray-700"}
               ${isSubMenu ? "pl-8" : ""}
               ${isCollapsed && !isSubMenu ? "justify-center" : ""}
-              ${item.path === "#" ? "cursor-pointer" : ""}
             `}
             onClick={() => handleMenuClick(item)}
+            title={!isCollapsed ? "" : item.name}
           >
+            {/* <ClipLoader loading={loading} size={20} color="#fff" className="mr-2" /> */}
             <span className="text-lg">{item.icon}</span>
             {(!isCollapsed || isSubMenu) && (
               <span className="ml-3 flex-1">
