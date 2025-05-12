@@ -64,7 +64,7 @@ export default function FaceDetection() {
         detectionInterval.current = null;
       }
     } else {
-      detectionInterval.current = setInterval(detectFaces, 1000); // Check every second
+      detectionInterval.current = setInterval(detectFaces, 10000); // Check every second
     }
     setDetectionActive(!detectionActive);
   };
@@ -98,7 +98,7 @@ export default function FaceDetection() {
       // Send the first face descriptor to the server for recognition
       const descriptor = detections[0].descriptor;
       console.log('Sending descriptor to server:', descriptor);
-      alert("got descriptor line 101")
+      alert("got descriptor line 101, "+ descriptor)
       recognizeFace(descriptor);
     } else {
       setRecognitionResult(null);

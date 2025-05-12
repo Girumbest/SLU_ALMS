@@ -1,4 +1,4 @@
-import FaceDetection from '@/components/FaceDetection';
+import FaceDetection from '@/components/FaceDetection1';
 
 export default function MarkAttendance() {
   return (

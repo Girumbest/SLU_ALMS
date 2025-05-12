@@ -37,10 +37,13 @@ twentyYearsAgo.setFullYear(today.getFullYear() - 20);
 const seventyYearsAgo = new Date(today);
 seventyYearsAgo.setFullYear(today.getFullYear() - 70);
 
- const dateOfBirthSchema = z.date()
-  .max(twentyYearsAgo, { message: "Must be at least 20 years old" })
-  .min(seventyYearsAgo, { message: "Must be less than 70 years old" });
-
+const dateOfBirthSchema = z.string()
+  .refine((dateString) => {
+    const date = new Date(dateString);
+    return !isNaN(date.getTime()) && date <= twentyYearsAgo && date >= seventyYearsAgo;
+  }, {
+    message: "Must be between 20 and 70 years old",
+});
 
 export const employeeSchema = z.object({
   firstName: z.string().min(2, "First Name must be at least 2 characters"),
@@ -90,7 +93,7 @@ export const employeeEditSchema = z.object({
   role: z.enum(["Employee", "Supervisor", "HRAdmin"]).optional(),
   educationalLevel: z.string().optional(),
   directDepositInfo: z.string().optional(),
-  faceDescriptor: z.string({message: "Face descriptor is required"}),
+  faceDescriptor: z.string({message: "Face descriptor is required"}).optional(),
   photograph: z.preprocess(
     (val) => (val === "" ? undefined : val), // Transform empty string to undefined
     photoSchema.optional()

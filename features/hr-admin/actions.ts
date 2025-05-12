@@ -180,9 +180,6 @@ export async function editUser(
   prevState: UserFormState,
   formData: FormData
 ): Promise<UserFormState> {
-// Models are already loaded by now
-  await loadFaceAPIModels(); // Returns instantly if already loaded
-
   const rawData = Object.fromEntries(formData.entries());
   const validatedData = employeeEditSchema.safeParse(rawData);
 
@@ -232,38 +229,20 @@ export async function editUser(
   let deletOldCv = false;
 
   // Process photograph if provided
-  if (data.photograph) {
+  if (data.photograph && data.faceDescriptor) {
     try {
-      const photographFile = data.photograph as File;
-      const img = await loadImageFromFile(photographFile);
-      
-      // Detect faces in the image
-      const detections = await faceapi
-        .detectAllFaces(img, new faceapi.TinyFaceDetectorOptions())
-        .withFaceLandmarks()
-        .withFaceDescriptors();
-      
-      // Validate face detection
-      if (detections.length === 0) {
-        return { errorMsg: "No face detected in the new photograph. Please upload a clear photo with one visible face." };
-      }
-      if (detections.length > 1) {
-        return { errorMsg: "Multiple faces detected in the new photograph. Please upload a photo with only one visible face." };
-      }
-      
       // Update both the photograph and face descriptor
-      updateData.photograph = await savePhoto(photographFile);
-      updateData.faceDescriptor = Array.from(detections[0].descriptor);
+      updateData.photograph = await savePhoto(data.photograph as File);
+      updateData.faceDescriptor = JSON.parse(data.faceDescriptor) as number[];
       deletOldPhoto = true;
     } catch (error) {
-      console.error('Face detection error:', error);
-      return { errorMsg: "Error processing face detection in the new photo. Please try again with a different photo." };
+      return { errorMsg: "Error saving the new photo. Please try again." };
     }
   }
 
   // Handle other fields
   for (let [field, value] of Object.entries(data)) {
-    if (field == "id" || field == "photograph") continue;
+    if (field == "id" || field == "photograph" || field == "faceDescriptor") continue;
 
     if (field == "dateOfBirth") {
       updateData.dateOfBirth = new Date(value as string);
@@ -295,16 +274,16 @@ export async function editUser(
   });
   if(deletOldPhoto){
     try {
-      const wasDeleted = await deleteFileIfExists("photos", existingUser?.photograph!);
-      console.log(wasDeleted ? "File was deleted" : "File didn't exist");
+      deleteFileIfExists("photos", existingUser?.photograph!);
+      // console.log(wasDeleted ? "File was deleted" : "File didn't exist");
     } catch (error) {
         console.error("Failed to delete file:", error);
     }
   }
   if(deletOldCv){
     try {
-      const wasDeleted = await deleteFileIfExists("cv", existingUser?.cv!);
-      console.log(wasDeleted ? "File was deleted" : "File didn't exist");
+      existingUser?.cv && deleteFileIfExists("cv", existingUser?.cv!);
+      // console.log(wasDeleted ? "File was deleted" : "File didn't exist");
     } catch (error) {
         console.error("Failed to delete file:", error);
     }
@@ -314,26 +293,6 @@ export async function editUser(
       ? "User updated successfully with new facial recognition data!" 
       : "User updated successfully!" 
   };
-}
-
-// Helper function to load an image from a File object
-async function loadImageFromFile(file: File): Promise<HTMLImageElement> {
-  return new Promise((resolve, reject) => {
-    const img = new Image();
-    const url = URL.createObjectURL(file);
-    
-    img.onload = () => {
-      URL.revokeObjectURL(url);
-      resolve(img);
-    };
-    
-    img.onerror = () => {
-      URL.revokeObjectURL(url);
-      reject(new Error('Failed to load image'));
-    };
-    
-    img.src = url;
-  });
 }
 
 // export async function editUser(

@@ -46,23 +46,41 @@ export default function EmployeeRegisterForm({departments}: {departments: {name:
     }
   },[state]);
 
+  const imgRef = useRef<HTMLImageElement>(null);
   const [modelsLoaded, setModelsLoaded] = useState(false);
   const [isDetectingFace, setIsDetectingFace] = useState(false);
+  // useEffect(() => {
+  //   async function loadModels() {
+  //     try {
+  //       await loadFaceAPIModels();
+  //       console.log("Face API models loaded successfully on the client!");
+  //       setModelsLoaded(true);
+  //     } catch (error) {
+  //       console.error("Failed to load Face API models:", error);
+  //       toast.error("Failed to load Face API models. Please try again later.");
+  //     }
+  //   }
+
+  //   loadModels();
+  // }, []);
   useEffect(() => {
     async function loadModels() {
       try {
-        await loadFaceAPIModels();
-        console.log("Face API models loaded successfully on the client!");
+        // setStatus('Loading models...');
+        const MODEL_URL = '/models';
+        await faceapi.nets.tinyFaceDetector.loadFromUri(MODEL_URL);
+        await faceapi.nets.faceLandmark68Net.loadFromUri(MODEL_URL);
+        await faceapi.nets.faceRecognitionNet.loadFromUri(MODEL_URL);
         setModelsLoaded(true);
+        // setStatus('Models loaded. Select two images to compare faces.');
       } catch (error) {
-        console.error("Failed to load Face API models:", error);
-        toast.error("Failed to load Face API models. Please try again later.");
+        console.error('Error loading models:', error);
+        // setStatus('Error loading models. Check console for details.');
       }
     }
 
     loadModels();
   }, []);
-
   const handlePhotoChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (file) setPhotoPreview(URL.createObjectURL(file));
@@ -75,12 +93,13 @@ export default function EmployeeRegisterForm({departments}: {departments: {name:
       setIsDetectingFace(true);
       // Convert the File to an HTMLImageElement
       const img = await loadImageFromFile(photographFile);
-
+      console.log("started detecting...")
       // Detect faces in the image
       const detections = await faceapi
-        .detectAllFaces(img, new faceapi.TinyFaceDetectorOptions())
+        .detectAllFaces(imgRef.current, new faceapi.TinyFaceDetectorOptions())
         .withFaceLandmarks()
         .withFaceDescriptors();
+      console.log("finished detecting...")
 
       // Check if exactly one face is detected
       if (detections.length === 0) {
@@ -113,7 +132,6 @@ export default function EmployeeRegisterForm({departments}: {departments: {name:
     e.preventDefault(); // Prevent default form reset
     // await action(new FormData(form)
     const formData = new FormData(e.currentTarget)
-    console.log(fomData.get("dateOfBirth"))
     const faceDescriptor = await getFaceDescription(formData.get('photograph') as File);
     if(faceDescriptor){
       formData.set('faceDescriptor', JSON.stringify(faceDescriptor));
@@ -126,7 +144,7 @@ export default function EmployeeRegisterForm({departments}: {departments: {name:
     //If not selected set the file type to '' for zod validation / Normalize empty file inputs
     if(!(formData.get("cv") as File).size) formData.set("cv","")
     startTransition(async () => {
-      
+      console.log('Submitting...')
       await formAction(formData);
     });
 
@@ -297,8 +315,8 @@ export default function EmployeeRegisterForm({departments}: {departments: {name:
           <label className="font-semibold text-gray-700 flex items-center">
             <FaUpload className="mr-2 text-blue-600" /> Upload Photograph:
           </label>
-          <input type="file" disabled={!modelsLoaded} accept="image/*" name="photograph" onChange={handlePhotoChange} className="input mt-2 bg-white" />
-          {photoPreview && <img src={photoPreview} alt="Preview" className="w-24 h-24 rounded-full object-cover mt-2" />}
+          <input type="file"  disabled={!modelsLoaded} accept="image/*" name="photograph" onChange={handlePhotoChange} className="input mt-2 bg-white" />
+          {photoPreview && <img src={photoPreview} ref={imgRef} alt="Preview" className="w-24 h-24 rounded-full object-cover mt-2" />}
           {state.errors?.photograph && <p className="text-red-500 text-sm error-message">{state.errors.photograph [0]}</p>}
         </div>
 

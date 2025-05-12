@@ -13,6 +13,8 @@ import { generatePassword, generateUsername } from "@/utils/generate";
 import { getDepartments } from "@/lib/db-ops";
 
 import { getEmployees } from "@/lib/db-ops";
+import * as faceapi from 'face-api.js';
+import { ClipLoader } from "react-spinners";
 // import { Employee } from "../../types";
 interface Employee {
     id: number;
@@ -83,6 +85,94 @@ export function EmployeeEditForm({ employee, departments }: EmployeeEditFormProp
     }
   }, [employee]);
 
+  //Face Detection and Description Extraction
+  const imgRef = useRef<HTMLImageElement>(null);
+  const [modelsLoaded, setModelsLoaded] = useState(false);
+  const [isDetectingFace, setIsDetectingFace] = useState(false);
+  useEffect(() => {
+    async function loadModels() {
+      try {
+        // setStatus('Loading models...');
+        const MODEL_URL = '/models';
+        await faceapi.nets.tinyFaceDetector.loadFromUri(MODEL_URL);
+        await faceapi.nets.faceLandmark68Net.loadFromUri(MODEL_URL);
+        await faceapi.nets.faceRecognitionNet.loadFromUri(MODEL_URL);
+        setModelsLoaded(true);
+        // setStatus('Models loaded. Select two images to compare faces.');
+      } catch (error) {
+        console.error('Error loading models:', error);
+        // setStatus('Error loading models. Check console for details.');
+      }
+    }
+
+    loadModels();
+  }, []);
+
+  const getFaceDescription = async (photographFile: File) => {
+    let faceDescriptor: number[] | null = null;
+    try {
+      setIsDetectingFace(true);
+      // Convert the File to an HTMLImageElement
+      // const img = await loadImageFromFile(photographFile);
+      // Detect faces in the image
+      const detections = await faceapi
+        .detectAllFaces(imgRef.current, new faceapi.TinyFaceDetectorOptions())
+        .withFaceLandmarks()
+        .withFaceDescriptors();
+      console.log("finished detecting...")
+
+      // Check if exactly one face is detected
+      if (detections.length === 0) {
+        toast.error("No face detected in the photograph. Please upload a photo with a visible face.");
+        return null;
+      }
+      if (detections.length > 1) {
+        toast.error("Multiple faces detected in the photograph. Please upload a photo with a single visible face.");
+        return null;
+      }
+
+      // Get the face descriptor (convert Float32Array to regular array for storage)
+      faceDescriptor = Array.from(detections[0].descriptor);
+    } catch (error: any) {
+      console.error("Face detection error:", error);
+      let errorMessage = "An error occurred during face detection. Please try again with a different photograph.";
+      if (error.message.includes("Failed to fetch")) { // Example of more specific error handling
+        errorMessage = "Failed to load the image. Please check the image file and try again.";
+      }
+      toast.error(errorMessage);
+      return null;
+    } finally {
+      setIsDetectingFace(false);
+    }
+  
+    return faceDescriptor;
+  };
+
+  const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
+    e.preventDefault(); // Prevent default form reset
+    const formData = new FormData(e.currentTarget)
+    //If not selected set the file type to "" for zod validation
+    if(!(formData.get("photograph") as File).size) formData.set("photograph","")
+    if(!(formData.get("cv") as File).size) formData.set("cv","")
+
+    //if photograph has been changed
+    if(imgRef.current && (formData.get("photograph") as File).size){
+      const faceDescriptor = await getFaceDescription(formData.get('photograph') as File);
+      if(faceDescriptor){
+        formData.set('faceDescriptor', JSON.stringify(faceDescriptor));
+      }
+      else{
+        toast.error("Face detection failed. Please upload a photo with a clear, single face.");
+        return;
+      }
+    }
+
+    startTransition(async () => {
+      // await action(new FormData(form)
+      await formAction(formData); // Manually trigger form action
+    });
+  }; 
+
   const formatDate = (date: Date | null) => {
     if (!date) return "";
     const year = date.getFullYear();
@@ -91,26 +181,10 @@ export function EmployeeEditForm({ employee, departments }: EmployeeEditFormProp
     return `${year}-${month}-${day}`;
   };
 
-
   const handlePhotoChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (file) setPhotoPreview(URL.createObjectURL(file));
   };
-
-  const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
-    e.preventDefault(); // Prevent default form reset
-
-    const formData = new FormData(e.currentTarget)
-    //If not selected set the file type to "" for zod validation
-    if(!(formData.get("photograph") as File).size) formData.set("photograph","")
-    if(!(formData.get("cv") as File).size) formData.set("cv","")
-
-    startTransition(async () => {
-      // await action(new FormData(form)
-      await formAction(formData); // Manually trigger form action
-    });
-  }; 
-
 
   return (
     
@@ -348,8 +422,8 @@ export function EmployeeEditForm({ employee, departments }: EmployeeEditFormProp
           <label className="font-semibold text-gray-700 flex items-center">
             <FaUpload className="mr-2 text-blue-600" /> Upload Photograph:
           </label>
-          <input type="file" accept="image/*" name="photograph" onChange={handlePhotoChange} className="input mt-2 bg-white" />
-          {<img src={photoPreview || `/api/photos/${employee.photograph}`} alt="Preview" className="w-24 h-24 rounded-full object-cover mt-2" />}
+          <input type="file" disabled={!modelsLoaded} accept="image/*" name="photograph" onChange={handlePhotoChange} className="input mt-2 bg-white" />
+          {<img ref={imgRef} src={photoPreview || `/api/photos/${employee.photograph}`} alt="Preview" className="w-24 h-24 rounded-full object-cover mt-2" />}
           {state.errors?.photograph && <p className="text-red-500 text-sm error-message">{state.errors.photograph [0]}</p>}
         </div>
 
@@ -365,13 +439,10 @@ export function EmployeeEditForm({ employee, departments }: EmployeeEditFormProp
         </div>
         
         <div className="col-span-2 flex gap-4">
-            <button
-                type="submit"
-                className="bg-blue-600 text-white p-3 rounded-lg hover:bg-blue-700 transition flex-1 text-center"
-                disabled={isPending}
-            >
-                {isPending ? "Updating..." : "Update Employee"}
-            </button>
+        <button type="submit" disabled={isPending || isDetectingFace} className="col-span-1 md:col-span-2 bg-blue-600 text-white p-3 rounded-lg hover:bg-blue-700 transition flex items-center justify-center" >
+          <ClipLoader color="#fff" loading={isPending || isDetectingFace} size={20} />
+          <span className="ml-2">{isDetectingFace ? "Detecting Face..." : isPending ? "Updating..." : "Update"}</span>
+        </button>
             <Link
                 href={"/admin/employees"}
                 className="bg-gray-500 text-white p-3 rounded-lg hover:bg-gray-700 transition flex-1 text-center"
