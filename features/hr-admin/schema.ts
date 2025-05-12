@@ -30,13 +30,25 @@ const fileSchema = z.instanceof(File).refine(
   }
 );
 
+const today = new Date();
+const twentyYearsAgo = new Date(today);
+twentyYearsAgo.setFullYear(today.getFullYear() - 20);
+
+const seventyYearsAgo = new Date(today);
+seventyYearsAgo.setFullYear(today.getFullYear() - 70);
+
+ const dateOfBirthSchema = z.date()
+  .max(twentyYearsAgo, { message: "Must be at least 20 years old" })
+  .min(seventyYearsAgo, { message: "Must be less than 70 years old" });
+
+
 export const employeeSchema = z.object({
   firstName: z.string().min(2, "First Name must be at least 2 characters"),
   lastName: z.string().min(2, "Last Name must be at least 2 characters"),
   username: z.string().min(3, "Username must be at least 3 characters"),
   password: z.string().min(6, "Password must be at least 6 characters"),
   phoneNumber: z.string().regex(/^\+?\d{10,14}$/, "Invalid phone number"),
-  dateOfBirth: z.string().refine((date) => !isNaN(Date.parse(date)), "Invalid date"),
+  dateOfBirth: dateOfBirthSchema,//z.string().refine((date) => !isNaN(Date.parse(date)), "Invalid date"),
   gender: z.enum(["Male", "Female"]),
   maritalStatus: z.enum(["Single", "Married", "Divorced", "Widowed"]).optional(),
   emergencyContactName: z.string().optional(),
@@ -50,11 +62,11 @@ export const employeeSchema = z.object({
   role: z.enum(["Employee", "Supervisor", "HRAdmin"]).optional(),
   educationalLevel: z.string().optional(),
   directDepositInfo: z.string().optional(),
-  // certificates: z.array(z.instanceof(File)).optional(),
+  faceDescriptor: z.string({message: "Face descriptor is required"}),
   photograph: photoSchema,//z.instanceof(File, { message: "Invalid photograph format" }),
   cv: z.preprocess(
-    (val) => (val === "" ? undefined : val), // Transform empty string to undefined
-    fileSchema.optional()
+    (val) => (val === "" || val === null || val === undefined ? undefined : val),
+    fileSchema.optional().nullable()
   ),
 });
 export const employeeEditSchema = z.object({
@@ -64,7 +76,7 @@ export const employeeEditSchema = z.object({
   username: z.string().min(3, "Username must be at least 3 characters"),
   password: z.string().min(6, "Password must be at least 6 characters"),
   phoneNumber: z.string().regex(/^\+?\d{10,14}$/, "Invalid phone number"),
-  dateOfBirth: z.string().refine((date) => !isNaN(Date.parse(date)), "Invalid date"),
+  dateOfBirth: dateOfBirthSchema,//z.string().refine((date) => !isNaN(Date.parse(date)), "Invalid date"),
   gender: z.enum(["Male", "Female"]),
   maritalStatus: z.enum(["Single", "Married", "Divorced", "Widowed"]).optional(),
   emergencyContactName: z.string().optional(),
@@ -78,7 +90,7 @@ export const employeeEditSchema = z.object({
   role: z.enum(["Employee", "Supervisor", "HRAdmin"]).optional(),
   educationalLevel: z.string().optional(),
   directDepositInfo: z.string().optional(),
-  // certificates: z.array(z.instanceof(File)).optional(),
+  faceDescriptor: z.string({message: "Face descriptor is required"}),
   photograph: z.preprocess(
     (val) => (val === "" ? undefined : val), // Transform empty string to undefined
     photoSchema.optional()

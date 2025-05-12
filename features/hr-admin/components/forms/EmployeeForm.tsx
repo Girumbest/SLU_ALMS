@@ -10,10 +10,9 @@ import toast from "react-hot-toast";
 import SearchableDropdown from "@/components/SearchableDropdown";
 import { generatePassword, generateUsername } from "@/utils/generate";
 import { getDepartments } from "@/lib/db-ops";
-
-//TODO: Get departments from the database
-
-// const departments = [{name: "Apple", id: "an apples id"}, {name: "Banana"}, {name: "Cherry"}, {name: "Date"}, {name: "Grape"}, {name: "Mango"}, {name: "Orange"}];
+import { loadFaceAPIModels, loadImageFromFile } from "@/lib/face-api-init";
+import * as faceapi from 'face-api.js';
+import { ClipLoader } from "react-spinners";
 
 
 const initialState: UserFormState = {}
@@ -41,24 +40,95 @@ export default function EmployeeRegisterForm({departments}: {departments: {name:
     if(state.successMsg){
       toast.success(state.successMsg)
       // Request the form to reset once the action has completed
-      formRef.current?.reset();
+      // formRef.current?.reset();
     }else if(state.errorMsg){
       toast.error(state.errorMsg)
     }
   },[state]);
+
+  const [modelsLoaded, setModelsLoaded] = useState(false);
+  const [isDetectingFace, setIsDetectingFace] = useState(false);
+  useEffect(() => {
+    async function loadModels() {
+      try {
+        await loadFaceAPIModels();
+        console.log("Face API models loaded successfully on the client!");
+        setModelsLoaded(true);
+      } catch (error) {
+        console.error("Failed to load Face API models:", error);
+        toast.error("Failed to load Face API models. Please try again later.");
+      }
+    }
+
+    loadModels();
+  }, []);
 
   const handlePhotoChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (file) setPhotoPreview(URL.createObjectURL(file));
   };
 
+  const getFaceDescription = async (photographFile: File) => {
+    let faceDescriptor: number[] | null = null;
+
+    try {
+      setIsDetectingFace(true);
+      // Convert the File to an HTMLImageElement
+      const img = await loadImageFromFile(photographFile);
+
+      // Detect faces in the image
+      const detections = await faceapi
+        .detectAllFaces(img, new faceapi.TinyFaceDetectorOptions())
+        .withFaceLandmarks()
+        .withFaceDescriptors();
+
+      // Check if exactly one face is detected
+      if (detections.length === 0) {
+        toast.error("No face detected in the photograph. Please upload a photo with a visible face.");
+        return null;
+      }
+      if (detections.length > 1) {
+        toast.error("Multiple faces detected in the photograph. Please upload a photo with a single visible face.");
+        return null;
+      }
+
+      // Get the face descriptor (convert Float32Array to regular array for storage)
+      faceDescriptor = Array.from(detections[0].descriptor);
+    } catch (error: any) {
+      console.error("Face detection error:", error);
+      let errorMessage = "An error occurred during face detection. Please try again with a different photograph.";
+      if (error.message.includes("Failed to fetch")) { // Example of more specific error handling
+        errorMessage = "Failed to load the image. Please check the image file and try again.";
+      }
+      toast.error(errorMessage);
+      return null;
+    } finally {
+      setIsDetectingFace(false);
+    }
+  
+    return faceDescriptor;
+  };
+
   const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault(); // Prevent default form reset
+    // await action(new FormData(form)
+    const formData = new FormData(e.currentTarget)
+    console.log(fomData.get("dateOfBirth"))
+    const faceDescriptor = await getFaceDescription(formData.get('photograph') as File);
+    if(faceDescriptor){
+      formData.set('faceDescriptor', JSON.stringify(faceDescriptor));
+    }
+    else{
+      toast.error("Face detection failed. Please upload a photo with a clear, single face.");
+      return;
+    }
 
+    //If not selected set the file type to '' for zod validation / Normalize empty file inputs
+    if(!(formData.get("cv") as File).size) formData.set("cv","")
     startTransition(async () => {
-      // await action(new FormData(form)
-      await formAction(new FormData(e.currentTarget)); // Manually trigger form action
-  });
+      
+      await formAction(formData);
+    });
 
   };
 
@@ -227,7 +297,7 @@ export default function EmployeeRegisterForm({departments}: {departments: {name:
           <label className="font-semibold text-gray-700 flex items-center">
             <FaUpload className="mr-2 text-blue-600" /> Upload Photograph:
           </label>
-          <input type="file" accept="image/*" name="photograph" onChange={handlePhotoChange} className="input mt-2 bg-white" />
+          <input type="file" disabled={!modelsLoaded} accept="image/*" name="photograph" onChange={handlePhotoChange} className="input mt-2 bg-white" />
           {photoPreview && <img src={photoPreview} alt="Preview" className="w-24 h-24 rounded-full object-cover mt-2" />}
           {state.errors?.photograph && <p className="text-red-500 text-sm error-message">{state.errors.photograph [0]}</p>}
         </div>
@@ -240,9 +310,11 @@ export default function EmployeeRegisterForm({departments}: {departments: {name:
           <input type="file" accept="application/pdf" name="cv" className="input mt-2 bg-white" />
         </div>
 
-        <button type="submit" className="col-span-1 md:col-span-2 bg-blue-600 text-white p-3 rounded-lg hover:bg-blue-700 transition" disabled={isPending}>
-          {isPending ? "Submitting..." : "Submit"}
+        <button type="submit" disabled={isPending || isDetectingFace} className="col-span-1 md:col-span-2 bg-blue-600 text-white p-3 rounded-lg hover:bg-blue-700 transition flex items-center justify-center" >
+          <ClipLoader color="#fff" loading={isPending || isDetectingFace} size={20} />
+          <span className="ml-2">{isDetectingFace ? "Detecting Face..." : isPending ? "Submitting..." : "Submit"}</span>
         </button>
+
          {/* Success Message */}
          {/* {state.success && <p className="text-green-600 text-center col-span-2">{state.success}</p>} */}
       </form>

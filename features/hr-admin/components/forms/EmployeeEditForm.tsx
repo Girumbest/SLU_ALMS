@@ -12,11 +12,6 @@ import SearchableDropdown from "@/components/SearchableDropdown";
 import { generatePassword, generateUsername } from "@/utils/generate";
 import { getDepartments } from "@/lib/db-ops";
 
-//TODO: Get departments from the database
-
-// const departments = [{name: "Apple", id: "an apples id"}, {name: "Banana"}, {name: "Cherry"}, {name: "Date"}, {name: "Grape"}, {name: "Mango"}, {name: "Orange"}];
-
-
 import { getEmployees } from "@/lib/db-ops";
 // import { Employee } from "../../types";
 interface Employee {

@@ -12,8 +12,9 @@ import { revalidatePath } from "next/cache";
 import { RecurringType } from "@prisma/client";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
-import * as faceapi from 'face-api.js';
+// import * as faceapi from 'face-api.js';
 
+import { loadFaceAPIModels } from '@/lib/face-api-init'; // Runs once on server start
 
 async function session() {
   //Logged-in User session
@@ -100,16 +101,13 @@ export async function createUser(
   prevState: UserFormState,
   formData: FormData
 ): Promise<UserFormState> {
-  // First, load face-api.js models (should be done once at application startup)
-  // You might want to move this to a separate initialization function
-  await faceapi.nets.tinyFaceDetector.loadFromUri('/models');
-  await faceapi.nets.faceLandmark68Net.loadFromUri('/models');
-  await faceapi.nets.faceRecognitionNet.loadFromUri('/models');
+  // await loadFaceAPIModels(); // Returns instantly if already loaded
 
   const rawData = Object.fromEntries(formData.entries());
   const validatedData = employeeSchema.safeParse(rawData);
 
   if (!validatedData.success) {
+    console.log(rawData?.cv)
     return {
       errorMsg: "Validation failed",
       errors: validatedData.error.flatten().fieldErrors,
@@ -148,35 +146,6 @@ export async function createUser(
     if(supervisor) return {errorMsg: "Department already has a supervisor."}
   }
 
-  // Process the photograph for face detection
-  const photographFile = data.photograph as File;
-  let faceDescriptor: number[] | null = null;
-
-  try {
-    // Convert the File to an HTMLImageElement
-    const img = await loadImageFromFile(photographFile);
-    
-    // Detect faces in the image
-    const detections = await faceapi
-      .detectAllFaces(img, new faceapi.TinyFaceDetectorOptions())
-      .withFaceLandmarks()
-      .withFaceDescriptors();
-    
-    // Check if exactly one face is detected
-    if (detections.length === 0) {
-      return { errorMsg: "No face detected in the photograph. Please upload a clear photo with one visible face." };
-    }
-    if (detections.length > 1) {
-      return { errorMsg: "Multiple faces detected in the photograph. Please upload a photo with only one visible face." };
-    }
-    
-    // Get the face descriptor (convert Float32Array to regular array for storage)
-    faceDescriptor = Array.from(detections[0].descriptor);
-  } catch (error) {
-    console.error('Face detection error:', error);
-    return { errorMsg: "Error processing face detection. Please try again with a different photo." };
-  }
-
   // Save to database
   await prisma.user.create({
     data: {
@@ -198,8 +167,8 @@ export async function createUser(
       maritalStatus: data.maritalStatus,
       departmentId: data.department,
       role: data.role,
-      faceDescriptor: faceDescriptor,
-      photograph: await savePhoto(photographFile), //returns photos filename
+      faceDescriptor: JSON.parse(data.faceDescriptor) as number[],
+      photograph: await savePhoto(data.photograph), //returns photos filename
       cv: (data.cv || undefined) && (await saveCV(data.cv as File)),
     },
   });
@@ -211,11 +180,8 @@ export async function editUser(
   prevState: UserFormState,
   formData: FormData
 ): Promise<UserFormState> {
-  // Load face-api.js models if not already loaded
-  // In a production app, you should load these once at startup
-  await faceapi.nets.tinyFaceDetector.loadFromUri('/models');
-  await faceapi.nets.faceLandmark68Net.loadFromUri('/models');
-  await faceapi.nets.faceRecognitionNet.loadFromUri('/models');
+// Models are already loaded by now
+  await loadFaceAPIModels(); // Returns instantly if already loaded
 
   const rawData = Object.fromEntries(formData.entries());
   const validatedData = employeeEditSchema.safeParse(rawData);
@@ -237,6 +203,8 @@ export async function editUser(
       id: true,
       firstName: true,
       lastName: true,
+      photograph: true,
+      cv: true,
     },
   });
 
@@ -260,7 +228,9 @@ export async function editUser(
   }
 
   const updateData: any = {};
-  
+  let deletOldPhoto = false;
+  let deletOldCv = false;
+
   // Process photograph if provided
   if (data.photograph) {
     try {
@@ -284,6 +254,7 @@ export async function editUser(
       // Update both the photograph and face descriptor
       updateData.photograph = await savePhoto(photographFile);
       updateData.faceDescriptor = Array.from(detections[0].descriptor);
+      deletOldPhoto = true;
     } catch (error) {
       console.error('Face detection error:', error);
       return { errorMsg: "Error processing face detection in the new photo. Please try again with a different photo." };
@@ -308,6 +279,7 @@ export async function editUser(
     }
     if (field == "cv") {
       value && (updateData.cv = await saveCV(value as File));
+      deletOldCv = true;
       continue;
     }
 
@@ -321,7 +293,22 @@ export async function editUser(
     },
     data: updateData,
   });
-
+  if(deletOldPhoto){
+    try {
+      const wasDeleted = await deleteFileIfExists("photos", existingUser?.photograph!);
+      console.log(wasDeleted ? "File was deleted" : "File didn't exist");
+    } catch (error) {
+        console.error("Failed to delete file:", error);
+    }
+  }
+  if(deletOldCv){
+    try {
+      const wasDeleted = await deleteFileIfExists("cv", existingUser?.cv!);
+      console.log(wasDeleted ? "File was deleted" : "File didn't exist");
+    } catch (error) {
+        console.error("Failed to delete file:", error);
+    }
+  }
   return { 
     successMsg: data.photograph 
       ? "User updated successfully with new facial recognition data!" 
@@ -1999,7 +1986,6 @@ const savePhoto = async (file: File): Promise<string> => {
     throw error;
   }
 };
-
 //pdf file
 const saveCV = async (file: File): Promise<string> => {
   try {
@@ -2025,6 +2011,32 @@ const saveCV = async (file: File): Promise<string> => {
     throw error;
   }
 };
+async function deleteFileIfExists(folder: string, fileName: string): Promise<boolean> {
+  const uploadDir = path.join(process.cwd(), "uploads", folder);
+  const filePath = path.join(uploadDir, fileName);
+  const fullPath = path.resolve(filePath);
+
+  try {
+      // Check if file exists
+      try {
+          await fs.access(fullPath);
+      } catch {
+          return false; // File doesn't exist
+      }
+
+      // Get file stats to make sure it's not a directory
+      const stats = await fs.stat(fullPath);
+      if (stats.isDirectory()) {
+          throw new Error(`Path ${fullPath} is a directory, not a file`);
+      }
+
+      await fs.unlink(fullPath);
+      return true;
+  } catch (error) {
+      console.error(`Error deleting file ${filePath}:`, error);
+      throw error;
+  }
+}
 
 const formatDate = async (date: Date) => {
   const startOfDay = new Date(date);
