@@ -1,6 +1,6 @@
 "use client";
 import { useEffect, useRef, useState, useActionState, useTransition } from "react";
-import { FaUser, FaPhone, FaEnvelope, FaLock, FaBriefcase, FaUniversity, FaUpload, FaDollarSign, FaCalendarAlt, FaAddressBook, FaWallet, FaEye, FaEyeSlash } from "react-icons/fa";
+import { FaUser, FaPhone, FaEnvelope, FaLock, FaBriefcase, FaUniversity, FaUpload, FaDollarSign, FaCalendarAlt, FaAddressBook, FaWallet, FaEye, FaEyeSlash, FaCamera } from "react-icons/fa";
 
 import { createUser } from "../../actions";
 import { UserFormState } from "../../types";
@@ -13,6 +13,7 @@ import { getDepartments } from "@/lib/db-ops";
 import { loadFaceAPIModels, loadImageFromFile } from "@/lib/face-api-init";
 import * as faceapi from 'face-api.js';
 import { ClipLoader } from "react-spinners";
+import CameraCapture from "@/components/CameraCapture";
 
 
 const initialState: UserFormState = {}
@@ -34,6 +35,8 @@ export default function EmployeeRegisterForm({departments}: {departments: {name:
   const [isHiddenPassword, setIsHiddenPassword] = useState(true);
   
   const [photoPreview, setPhotoPreview] = useState<string | null>(null);
+  const [photoSource, setPhotoSource] = useState<'upload' | 'camera'>('upload');
+  const [capturedPhoto, setCapturedPhoto] = useState<File | null>(null); // New state
 
   useEffect(()=>{
     console.log(state.errors)
@@ -81,10 +84,35 @@ export default function EmployeeRegisterForm({departments}: {departments: {name:
 
     loadModels();
   }, []);
+  // const handlePhotoChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+  //   const file = e.target.files?.[0];
+  //   if (file) setPhotoPreview(URL.createObjectURL(file));
+  // };
+  //---------------------------------------
+
   const handlePhotoChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
-    if (file) setPhotoPreview(URL.createObjectURL(file));
+    if (file) {
+      setPhotoPreview(URL.createObjectURL(file));
+      setCapturedPhoto(file); // Store the File object
+      setPhotoSource('upload');
+    }
   };
+  const [openCanvas, setOpenCanvas] = useState(false);
+  const handleCapture = (blob: Blob) => {
+    const file = new File([blob], "captured_photo.jpg", { type: "image/jpeg" }); // Create a File object
+    setPhotoPreview(URL.createObjectURL(file));
+    setCapturedPhoto(file); // Store the File object
+    setPhotoSource('camera');
+    setOpenCanvas(false); // Hide the canvas after capturing
+  };
+  
+  const togglePhotoSource = () => {
+    setPhotoSource(prevSource => (prevSource === 'upload' ? 'camera' : 'upload'));
+    setPhotoPreview(null);
+    setCapturedPhoto(null); // Clear the captured photo when toggling
+  };
+  //---------------------------------------
 
   const getFaceDescription = async (photographFile: File) => {
     let faceDescriptor: number[] | null = null;
@@ -92,7 +120,7 @@ export default function EmployeeRegisterForm({departments}: {departments: {name:
     try {
       setIsDetectingFace(true);
       // Convert the File to an HTMLImageElement
-      const img = await loadImageFromFile(photographFile);
+      // const img = await loadImageFromFile(photographFile);
       console.log("started detecting...")
       // Detect faces in the image
       const detections = await faceapi
@@ -130,14 +158,23 @@ export default function EmployeeRegisterForm({departments}: {departments: {name:
 
   const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault(); // Prevent default form reset
-    // await action(new FormData(form)
-    const formData = new FormData(e.currentTarget)
-    const faceDescriptor = await getFaceDescription(formData.get('photograph') as File);
-    if(faceDescriptor){
-      formData.set('faceDescriptor', JSON.stringify(faceDescriptor));
-    }
-    else{
-      toast.error("Face detection failed. Please upload a photo with a clear, single face.");
+    const formData = new FormData(e.currentTarget);
+
+    // Use the capturedPhoto state if available, otherwise get from input
+    const photograph = capturedPhoto || formData.get('photograph');
+
+    if (photograph instanceof File && photograph.size > 0) {
+      const faceDescriptor = await getFaceDescription(photograph);
+      if(faceDescriptor){
+        formData.set('faceDescriptor', JSON.stringify(faceDescriptor));
+        formData.set('photograph', photograph); // Ensure the File object is in formData
+      }
+      else{
+        toast.error("Face detection failed. Please upload a photo with a clear, single face.");
+        return;
+      }
+    } else {
+      toast.error("Please provide a photograph.");
       return;
     }
 
@@ -313,14 +350,52 @@ export default function EmployeeRegisterForm({departments}: {departments: {name:
         {/* Photograph Upload */}
         <div className="col-span-1 md:col-span-2">
           <label className="font-semibold text-gray-700 flex items-center">
-            <FaUpload className="mr-2 text-blue-600" /> Upload Photograph:
+            {photoSource === 'upload' ? (
+              <>
+                <FaUpload className="mr-2 text-blue-600" /> Upload Photograph:
+              </>
+            ) : (
+              <>
+                <FaCamera className="mr-2 text-blue-600" /> Take Photograph:
+              </>
+            )}
           </label>
-          <input type="file"  disabled={!modelsLoaded} accept="image/*" name="photograph" onChange={handlePhotoChange} className="input mt-2 bg-white" />
-          {photoPreview && <img src={photoPreview} ref={imgRef} alt="Preview" className="w-24 h-24 rounded-full object-cover mt-2" />}
-          {state.errors?.photograph && <p className="text-red-500 text-sm error-message">{state.errors.photograph [0]}</p>}
+          <button
+            type="button"
+            onClick={togglePhotoSource}
+            className="col-span-1 bg-gray-300 text-gray-700 py-1 px-3 rounded-md text-sm hover:bg-gray-400 transition"
+          >
+            {photoSource === 'upload' ? 'Use Camera' : 'Upload'}
+          </button>
+          {photoSource === 'upload' ? (
+            <input
+              type="file"
+              disabled={!modelsLoaded}
+              accept="image/*"
+              name="photograph"
+              onChange={handlePhotoChange}
+              className="input mt-2 bg-white"
+            />
+          ) : (
+            <CameraCapture onCapture={handleCapture} />
+          )}
+          {photoPreview && (
+            <img
+              src={photoPreview}
+              ref={imgRef}
+              alt="Preview"
+              className="w-24 h-24 rounded-full object-cover mt-2"
+            />
+          )}
+          {state.errors?.photograph && (
+            <p className="text-red-500 text-sm error-message">
+              {state.errors.photograph[0]}
+            </p>
+          )}
         </div>
 
-        {/* Certificate Upload */}
+
+        {/* CV Upload */}
         <div className="col-span-1 md:col-span-2">
           <label className="font-semibold text-gray-700 flex items-center">
             <FaUpload className="mr-2 text-blue-600" /> Upload CV (PDF):
