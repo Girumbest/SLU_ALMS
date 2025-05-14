@@ -30,12 +30,12 @@ async function session() {
 
 export async function getDashboardSummary(): Promise<DashboardSummary> {
   try {
-    const totalEmployees = await /* query to get total employees */;
-    const totalDepartments = await /* query to get total departments */;
-    const pendingLeaveRequests = await /* query for pending leave requests */;
-    const approvedLeaveRequests = await /* query for approved leave requests */;
-    const rejectedLeaveRequests = await /* query for rejected leave requests */;
-    const totalLeaveTypes = await /* query to get total leave types */;
+    const totalEmployees = 0//await /* query to get total employees */;
+    const totalDepartments = 0//await /* query to get total departments */;
+    const pendingLeaveRequests = 0//await /* query for pending leave requests */;
+    const approvedLeaveRequests = 0//await /* query for approved leave requests */;
+    const rejectedLeaveRequests = 0//await /* query for rejected leave requests */;
+    const totalLeaveTypes = 0//await /* query to get total leave types */;
 
     return {
       totalEmployees,
@@ -51,81 +51,81 @@ export async function getDashboardSummary(): Promise<DashboardSummary> {
   }
 }
 
-export async function createUser(
-  prevState: UserFormState,
-  formData: FormData
-): Promise<UserFormState> {
-  const rawData = Object.fromEntries(formData.entries());
-  const validatedData = employeeSchema.safeParse(rawData);
+// export async function createUser(
+//   prevState: UserFormState,
+//   formData: FormData
+// ): Promise<UserFormState> {
+//   const rawData = Object.fromEntries(formData.entries());
+//   const validatedData = employeeSchema.safeParse(rawData);
 
-  if (!validatedData.success) {
-    return {
-      errorMsg: "Validation failed",
-      errors: validatedData.error.flatten().fieldErrors,
-    };
-  }
-  let data = validatedData.data;
-  // console.log(data);
+//   if (!validatedData.success) {
+//     return {
+//       errorMsg: "Validation failed",
+//       errors: validatedData.error.flatten().fieldErrors,
+//     };
+//   }
+//   let data = validatedData.data;
+//   // console.log(data);
   
-  //Check for existence of a user with the same username
-  const existingUser = await prisma.user.findUnique({
-    where: {
-      username: data.username,
-    },
-    select: {
-      firstName: true,
-      lastName: true,
-    },
-  });
+//   //Check for existence of a user with the same username
+//   const existingUser = await prisma.user.findUnique({
+//     where: {
+//       username: data.username,
+//     },
+//     select: {
+//       firstName: true,
+//       lastName: true,
+//     },
+//   });
 
-  if (!!existingUser)
-    return {
-      errorMsg: `User ${existingUser.firstName} ${existingUser.lastName} has Username: ${data.username}`,
-    };
+//   if (!!existingUser)
+//     return {
+//       errorMsg: `User ${existingUser.firstName} ${existingUser.lastName} has Username: ${data.username}`,
+//     };
 
-  //There should be only one supervisor per department
-  if(data.role === "Supervisor"){
-    const supervisor = await prisma.user.findFirst({
-      where: {
-        departmentId: data.department,
-        role: "Supervisor",
-      },
-      select: {
-        id: true,
-      },
-    })
-    if(supervisor) return {errorMsg: "Department already has a supervisor."}
-  }
+//   //There should be only one supervisor per department
+//   if(data.role === "Supervisor"){
+//     const supervisor = await prisma.user.findFirst({
+//       where: {
+//         departmentId: data.department,
+//         role: "Supervisor",
+//       },
+//       select: {
+//         id: true,
+//       },
+//     })
+//     if(supervisor) return {errorMsg: "Department already has a supervisor."}
+//   }
 
-  // Save to database
-  await prisma.user.create({
-    data: {
-      firstName: data.firstName,
-      lastName: data.lastName,
-      username: data.username,
-      password: data.password,
-      address: data.address,
-      dateOfBirth: new Date(data.dateOfBirth),
-      gender: data.gender,
-      phoneNumber: data.phoneNumber,
-      emergencyContactPhone: data.emergencyContactPhone,
-      hireDate: new Date(data.hireDate),
-      jobTitle: data.jobTitle,
-      salary: data.salary,
-      positionLevel: data.positionLevel,
-      educationalLevel: data.educationalLevel,
-      directDepositInfo: data.directDepositInfo,
-      maritalStatus: data.maritalStatus,
-      departmentId: data.department,
-      role: data.role,
+//   // Save to database
+//   await prisma.user.create({
+//     data: {
+//       firstName: data.firstName,
+//       lastName: data.lastName,
+//       username: data.username,
+//       password: data.password,
+//       address: data.address,
+//       dateOfBirth: new Date(data.dateOfBirth),
+//       gender: data.gender,
+//       phoneNumber: data.phoneNumber,
+//       emergencyContactPhone: data.emergencyContactPhone,
+//       hireDate: new Date(data.hireDate),
+//       jobTitle: data.jobTitle,
+//       salary: data.salary,
+//       positionLevel: data.positionLevel,
+//       educationalLevel: data.educationalLevel,
+//       directDepositInfo: data.directDepositInfo,
+//       maritalStatus: data.maritalStatus,
+//       departmentId: data.department,
+//       role: data.role,
 
-      photograph: await savePhoto(data.photograph), //returns photos filename
-      cv: (data.cv || undefined) && (await saveCV(data.cv as File)),
-    },
-  });
+//       photograph: await savePhoto(data.photograph), //returns photos filename
+//       cv: (data.cv || undefined) && (await saveCV(data.cv as File)),
+//     },
+//   });
 
-  return { successMsg: "Form submitted successfully!" };
-}
+//   return { successMsg: "Form submitted successfully!" };
+// }
 
 export async function createUser(
   prevState: UserFormState,

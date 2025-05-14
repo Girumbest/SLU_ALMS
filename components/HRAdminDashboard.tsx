@@ -1,3 +1,4 @@
+"use client"
 import React, { useEffect, useState } from 'react';
 import { FaUsers, FaBuilding, FaClock, FaCheckCircle, FaTimesCircle, FaList } from 'react-icons/fa';
 import { getDashboardSummary } from '@/features/hr-admin/actions';
