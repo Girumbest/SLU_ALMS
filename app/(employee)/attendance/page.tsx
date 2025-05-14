@@ -43,6 +43,7 @@ export default function AttendancePage() {
         if(!response){return toast.error('Error fetching attendance register status');}
         if(response?.isWorkingDay === false){setIsWorkingDay(false); return}
         if(response?.onLeave){setIsOnLeave(true); return}
+        
         setAttendanceRegisterStatus(response as AttendanceRegisterStatus);
 
       } catch (error) {
@@ -103,6 +104,7 @@ export default function AttendancePage() {
         
         setAttendanceHistory(attendanceData);
       } catch (error) {
+        toast.error('Error fetching attendance history');
         console.error('Error fetching attendance history:', error);
       } finally {
         setIsLoading(false);
@@ -110,7 +112,7 @@ export default function AttendancePage() {
     };
     fetchAttendanceRegisterStatus();
     fetchAttendanceHistory();
-  }, []);
+  }, [session?.user?.id]);
 
   useEffect(() => {
     if (attendanceRegisterStatus) {

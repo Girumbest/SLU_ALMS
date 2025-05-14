@@ -1743,6 +1743,7 @@ export async function registerAttendanceByEmployee(id: number, status=false){
   return { successMsg: "Attendance registered successfully!" };
 }
 export async function getEmployeeAttendanceHistory(id: number){
+  console.log("IDDDD", id)
   const attendance = await prisma.attendance.findMany({
     orderBy: {
       date: "desc",
