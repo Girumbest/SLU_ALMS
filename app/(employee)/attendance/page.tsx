@@ -2,16 +2,19 @@
 import { useState, useEffect } from 'react';
 import FaceRecognition from '@/components/FaceDetection1'; // Your existing component
 import { useSession } from 'next-auth/react';
-import { registerAttendanceByEmployee } from '@/features/hr-admin/actions';
+import { getEmployeeAttendanceHistory, registerAttendanceByEmployee } from '@/features/hr-admin/actions';
 import toast from 'react-hot-toast';
 
 interface AttendanceRecord {
   id: string;
   userId: string; // Add userId field
-  date: string;
-  clockIn: string;
-  clockOut: string | null;
-  status: 'present' | 'absent' | 'late';
+  date: Date;
+  status: 'PRESENT' | 'ON_LEAVE' | 'ABSENT';
+  morningCheckInTime: Date;
+  morningCheckOutTime: Date;
+  afternoonCheckInTime: Date;
+  afternoonCheckOutTime: Date;
+  checkOutEnabled: boolean;
 }
 interface AttendanceRegisterStatus{
   timeOfTheDay:string;
@@ -36,7 +39,8 @@ export default function AttendancePage() {
   useEffect(() => {
     const fetchAttendanceRegisterStatus = async () => {
       try {
-        const response = await registerAttendanceByEmployee(Number(session?.user?.id), true)
+        const response = session?.user && await registerAttendanceByEmployee(Number(session?.user?.id), true)
+        if(!response){return toast.error('Error fetching attendance register status');}
         if(response?.isWorkingDay === false){setIsWorkingDay(false); return}
         if(response?.onLeave){setIsOnLeave(true); return}
         setAttendanceRegisterStatus(response as AttendanceRegisterStatus);
@@ -49,41 +53,55 @@ export default function AttendancePage() {
     const fetchAttendanceHistory = async () => {
       try {
         // In a real app, you would fetch this from your API
-        // await getEmployeeAttendanceHistory(id)
-        const mockData: AttendanceRecord[] = [
-          {
-            id: '1',
-            date: '2023-05-15',
-            clockIn: '09:00:00',
-            clockOut: '17:30:00',
-            status: 'present'
-          },
-          {
-            id: '2',
-            date: '2023-05-14',
-            clockIn: '09:15:00',
-            clockOut: '17:45:00',
-            status: 'late'
-          },
-          {
-            id: '3',
-            date: '2023-05-13',
-            clockIn: '08:45:00',
-            clockOut: '17:15:00',
-            status: 'present'
-          },
-        ];
+        const attendanceData: AttendanceRecord[] = session?.user ? await getEmployeeAttendanceHistory(Number(session?.user?.id)) : [];
+        
+        // const mockData: AttendanceRecord[] = [
+        //   {
+        //     id: '1',
+        //     date: '2023-05-15',
+        //     clockIn: '09:00:00',
+        //     morningCheckInTime: new Date(),
+        //     afternoonCheckInTime: new Date(),
+        //     morningCheckOutTime: new Date(),
+        //     afternoonCheckOutTime: new Date(),
+        //     checkOutEnabled: true,
+        //     clockOut: '17:30:00',
+        //     status: 'ABSENT'
+        //   },
+        //   {
+        //     id: '2',
+        //     date: '2023-05-14',
+        //     clockIn: '09:15:00',
+        //     clockOut: '17:45:00',
+        //     status: 'ON_LEAVE',
+        //     morningCheckInTime: new Date(),
+        //     afternoonCheckInTime: new Date(),
+        //     morningCheckOutTime: new Date(),
+        //     afternoonCheckOutTime: new Date(),
+        //   },
+        //   {
+        //     id: '3',
+        //     date: '2023-05-13',
+        //     clockIn: '08:45:00',
+        //     clockOut: '17:15:00',
+        //     status: 'PRESENT',
+        //     morningCheckInTime: new Date(),
+        //     afternoonCheckInTime: null,
+        //     morningCheckOutTime: new Date(),
+        //     afternoonCheckOutTime: new Date(),
+        //   },
+        // ];
         
         // Check if user is already clocked in today
-        const todayRecord = mockData.find(record => 
-          record.date === new Date().toISOString().split('T')[0]
-        );
+        // const todayRecord = mockData.find(record => 
+        //   record.date === new Date().toISOString().split('T')[0]
+        // );
         
-        if (todayRecord && !todayRecord.clockOut) {
-          setIsClockedIn(true);
-        }
+        // if (todayRecord && !todayRecord.clockOut) {
+        //   setIsClockedIn(true);
+        // }
         
-        setAttendanceHistory(mockData);
+        setAttendanceHistory(attendanceData);
       } catch (error) {
         console.error('Error fetching attendance history:', error);
       } finally {
@@ -168,7 +186,7 @@ export default function AttendancePage() {
             disabled={isClockedIn && !attendanceRegisterStatus?.checkOutEnabled || !isWorkingDay || isOnLeave || !attendanceRegisterStatus?.timeOfTheDay}
             onClick={handleClockAction}
             className={`relative overflow-hidden px-8 py-4 rounded-lg text-white font-bold text-lg shadow-lg transform transition-all duration-300 hover:scale-105 focus:outline-none focus:ring-2 focus:ring-offset-2 ${
-              (isClockedIn && !attendanceRegisterStatus?.checkOutEnabled || !isWorkingDay || isOnLeave) 
+              (isClockedIn && !attendanceRegisterStatus?.checkOutEnabled || !isWorkingDay || isOnLeave || !attendanceRegisterStatus?.timeOfTheDay) 
                 ? 'bg-gray-500 cursor-not-allowed' 
                 :
               isClockedIn 
@@ -186,6 +204,9 @@ export default function AttendancePage() {
             ></span>
             <span 
               className={`absolute inset-0 rounded-lg ${
+                (isClockedIn && !attendanceRegisterStatus?.checkOutEnabled || !isWorkingDay || isOnLeave || !attendanceRegisterStatus?.timeOfTheDay) 
+                ? 'bg-gray-500'
+                : 
                 isClockedIn ? 'bg-red-600' : 'bg-green-600'
               } opacity-0 hover:opacity-100 transition-opacity duration-300`}
             ></span>
@@ -224,21 +245,23 @@ export default function AttendancePage() {
                       </p>
                       <div className="flex space-x-4 mt-1">
                         <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
-                          record.status === 'present' 
+                          record.status === 'PRESENT' 
                             ? 'bg-green-100 text-green-800' 
-                            : record.status === 'late' 
-                              ? 'bg-yellow-100 text-yellow-800' 
+                            : record.status === 'ON_LEAVE' 
+                              ? 'bg-blue-100 text-blue-800' 
                               : 'bg-red-100 text-red-800'
                         }`}>
-                          {record.status.charAt(0).toUpperCase() + record.status.slice(1)}
+                          {record.status.charAt(0).toUpperCase() + record.status.slice(1).toLowerCase()}
                         </span>
                       </div>
                     </div>
                     <div className="text-right">
-                      <p className="text-sm text-gray-500">Clock In: {record.clockIn}</p>
-                      <p className="text-sm text-gray-500">
+                      <p className="text-sm text-gray-500"><span>M-Clock In: {record?.morningCheckInTime ? new Date(record?.morningCheckInTime)?.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: false, timeZone: 'UTC' }) : '--:--:--'}</span><span className='ml-2'>{record.checkOutEnabled && "M-Clock Out: "}</span><span>{record?.morningCheckOutTime ? new Date(record?.morningCheckOutTime)?.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: false, timeZone: 'UTC' }) : record.checkOutEnabled ? '--:--:--' : ''}</span></p>
+                      <p className="text-sm text-gray-500"><span>A-Clock In: {record?.afternoonCheckInTime ? new Date(record?.afternoonCheckInTime)?.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: false, timeZone: 'UTC' }) : '--:--:--'}</span><span className='ml-2'>{record.checkOutEnabled && "A-Clock Out: "}</span><span>{record?.afternoonCheckOutTime ? new Date(record?.afternoonCheckOutTime)?.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: false, timeZone: 'UTC' }) : record.checkOutEnabled ? '--:--:--' : ''}</span></p>
+                      
+                      {/* <p className="text-sm text-gray-500">
                         Clock Out: {record.clockOut || '--:--:--'}
-                      </p>
+                      </p> */}
                     </div>
                   </div>
                 </div>

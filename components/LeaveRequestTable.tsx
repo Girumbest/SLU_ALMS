@@ -67,11 +67,14 @@ const LeaveRequestTable: React.FC<EmployeeTableProps> = ({ departments }) => {
   const [leaveTypes, setLeaveTypes] = useState<{ id: number; name: string }[]>([]);
 
   const [dataLoading, setDataLoading] = useState<boolean>(true)
-  const [actionLoading, setActionLoading] = useState<boolean>(false);
-  const [rejectActionLoading, setRejectActionLoading] = useState<boolean>(false);
+  const [actionLoading, setActionLoading] = useState<{id: number, loading: boolean}>({id: 0, loading: false});
+  const [rejectActionLoading, setRejectActionLoading] = useState<{id: number, loading: boolean}>({id: 0, loading: false});
+
+  // const [rejectActionLoading, setRejectActionLoading] = useState<boolean>(false);
 
   const {data: session, status: sessionStatus} = useSession();
-  
+  const [success, setSuccess] = useState(false);
+
   useEffect(() => {
     const fetchData = async () => {
       const data = await getLeaveRequests(undefined, (session?.user?.role === "Supervisor" && session?.user?.department && Number(session?.user?.department)) || undefined);
@@ -85,7 +88,7 @@ const LeaveRequestTable: React.FC<EmployeeTableProps> = ({ departments }) => {
       // setTotalPages(data.total);
     };
     fetchData();
-  }, []);
+  }, [success]);
 
   const handleDateRangeChange = (startDate: string, endDate: string) => {
     if (!startDate && !endDate) {
@@ -99,18 +102,20 @@ const LeaveRequestTable: React.FC<EmployeeTableProps> = ({ departments }) => {
   };
 
   const handleLeaveApprove = async (leaveId: number) => {
-    setActionLoading(true);
+    setActionLoading({id: leaveId, loading: true});
     const leaveApprove = await approveLeave(leaveId);
     if(leaveApprove?.successMsg){
       toast.success(leaveApprove.successMsg)
+      setSuccess(true);
     }
     if(leaveApprove?.errorMsg){
       toast.error(leaveApprove.errorMsg)
     }
-    setActionLoading(false);
+    setActionLoading({id: leaveId, loading: false});
+
   }
   const handleLeaveReject = async (leaveId: number) => {
-    setRejectActionLoading(true);
+    setRejectActionLoading({id: leaveId, loading: true});
     const leaveReject = await rejectLeave(leaveId);
     if(leaveReject?.successMsg){
       toast.success(leaveReject.successMsg)
@@ -118,7 +123,7 @@ const LeaveRequestTable: React.FC<EmployeeTableProps> = ({ departments }) => {
     if(leaveReject?.errorMsg){
       toast.error(leaveReject.errorMsg)
     }
-    setRejectActionLoading(false);
+    setRejectActionLoading({id: leaveId, loading: false});
   }
 
   const handleFilterChange = (column: string, value: string) => {
@@ -512,12 +517,12 @@ const [isPrinting, setIsPrinting] = useState(false)
                           // href={`./leave/edit/${leave.user.username}`}
                           className="text-green-600 hover:text-green-800 mx-1"
                           title="Approve"
-                          disabled={(session?.user.role === "Supervisor" && !isSupApprovalRequired) || (session?.user.role === "HRAdmin" && (isSupApprovalRequired && !leave?.isSupervisorApproved)) || actionLoading}
+                          disabled={(session?.user.role === "Supervisor" && !isSupApprovalRequired) || (session?.user.role === "HRAdmin" && (isSupApprovalRequired && !leave?.isSupervisorApproved)) || (actionLoading.id === leave.id && actionLoading.loading)}
                           onClick={e => handleLeaveApprove(leave.id)}
                         >
-                          {!actionLoading && <FaThumbsUp size={18} />}
+                          {!(actionLoading.id === leave.id && actionLoading.loading) && <FaThumbsUp size={18} />}
                           <ClipLoader 
-                            loading={actionLoading}
+                            loading={actionLoading.id === leave.id && actionLoading.loading}
                             size={18}
                             color="green"
                             cssOverride={{
@@ -528,9 +533,9 @@ const [isPrinting, setIsPrinting] = useState(false)
                         </button>
                         <button title="Reject" 
                         className="text-red-600 hover:text-red-800 mx-1"
-                        disabled={(session?.user.role === "Supervisor" && !isSupApprovalRequired) || (session?.user.role === "HRAdmin" && (isSupApprovalRequired && !leave?.isSupervisorApproved)) || actionLoading}
+                        disabled={(session?.user.role === "Supervisor" && !isSupApprovalRequired) || (session?.user.role === "HRAdmin" && (isSupApprovalRequired && !leave?.isSupervisorApproved)) || (rejectActionLoading.id === leave.id && rejectActionLoading.loading)}
                           onClick={e => handleLeaveReject(leave.id)}>
-                          {!rejectActionLoading && <FaThumbsDown size={18} />}
+                          {!(rejectActionLoading.id === leave.id && rejectActionLoading.loading) && <FaThumbsDown size={18} />}
                           <ClipLoader 
                             size={18}
                             color="red"
@@ -538,7 +543,7 @@ const [isPrinting, setIsPrinting] = useState(false)
                                 display: 'block',
                                 margin: '0 auto',
                             }}
-                            loading={rejectActionLoading}
+                            loading={(rejectActionLoading.id === leave.id && rejectActionLoading.loading)}
                           />
                         </button>
                       </>

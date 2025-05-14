@@ -6,6 +6,7 @@ import { UserFormState } from "@/features/hr-admin/types";
 import toast from "react-hot-toast";
 import { useRouter } from "next/navigation";
 import { useSession } from "next-auth/react";
+import { ClipLoader } from "react-spinners";
 
 interface LeaveType {
   id: number;
@@ -28,7 +29,12 @@ const LeaveRequestPage = () => {
 
   const [leaveBalance, setLeaveBalance] = useState<number | null>(null);
   const [leaveDays, setLeaveDays] = useState<number>(0);
+  const [calculatingLeave, setCalculatingLeave] = useState<boolean>(false);
+  const [loadingLeaveBalance, setLoadingLeaveBalance] = useState<boolean>(false);
 
+  // const leaveTypes = []
+
+  // const leaveTypes = []
   const { data: session } = useSession();
   const empId = session?.user?.id; //temp
   
@@ -36,10 +42,13 @@ const LeaveRequestPage = () => {
     getLeaveTypes().then((data) => {
       setLeaveTypes(data.leaveTypes);
     });
-    if (selectedLeaveType)
+    if (selectedLeaveType){
+      setLoadingLeaveBalance(true);
       getLeaveBalance(Number(empId), selectedLeaveType).then((data) => {
         setLeaveBalance(data.leaveBalance?.balance!);
+        setLoadingLeaveBalance(false);
       });
+    }
     // setLeaveTypes([
     //   { id: 1, name: "Casual Leave" },
     //   { id: 2, name: "Sick Leave" },
@@ -69,7 +78,7 @@ const LeaveRequestPage = () => {
       toast.error("Please select start and end dates.");
       return;
     }
-    if (new Date(endDate) < new Date(startDate)) {
+    if (new Date(endDate) < new Date(startDate) || leaveTypes.find(type => type.id === selectedLeaveType)?.name !== "Sick Leave" && (new Date(endDate) < new Date() || new Date(startDate) < new Date())) {
       toast.error("Please select a valid date range.");
       return;
     }
@@ -91,14 +100,11 @@ const LeaveRequestPage = () => {
     // await formAction(formData);
   };
 
-  const setCalculatedLeaveDays =  () => {
+  const setCalculatedLeaveDays =  async () => {
     if (startDate && endDate) {
-      let days = 0;
-      calculateLeaveDays(new Date(startDate), new Date(endDate)).then((leaveDays) => {
-        days = leaveDays;
-      });
-      setLeaveDays(days);
-      // alert(days)
+      const leaveDays = await calculateLeaveDays(new Date(startDate), new Date(endDate));
+      setLeaveDays(leaveDays);
+      setCalculatingLeave(false);
     }
   }
 
@@ -160,14 +166,14 @@ const LeaveRequestPage = () => {
             id="endDate"
             name="endDate"
             value={endDate}
-            onChange={(e) => {setEndDate(e.target.value); setCalculatedLeaveDays()}}
+            onChange={(e) => {setEndDate(e.target.value); setCalculatingLeave(true);setCalculatedLeaveDays()}}
             className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm"
           />
         </div>
         <div className="mt-2 flex justify-between">
-          <p className="text-gray-700 sm:text-sm">No. Days: {leaveDays && leaveDays}</p>
+          <p className="text-gray-700 sm:text-sm">No. Days: <ClipLoader loading={calculatingLeave} size={18} />{leaveDays && leaveDays}</p>
           {/* <p className="text-gray-700 sm:text-sm">Leave Balance: {leaveBalance ? leaveBalance - (new Date(endDate).getDate() - new Date(startDate).getDate()) || leaveBalance : startDate && endDate ? leaveTypes.find(type => type.id === selectedLeaveType)?.maxDays! - (new Date(endDate).getDate() - new Date(startDate).getDate()) : leaveTypes.find(type => type.id === selectedLeaveType)?.maxDays}</p> */}
-          <p className="text-gray-700 sm:text-sm">Leave Balance: {leaveBalance ? leaveBalance - (leaveDays) || leaveBalance : startDate && endDate ? leaveTypes.find(type => type.id === selectedLeaveType)?.maxDays! - (leaveDays) : leaveTypes.find(type => type.id === selectedLeaveType)?.maxDays}</p>
+          <p className="text-gray-700 sm:text-sm">Leave Balance: <ClipLoader loading={loadingLeaveBalance} size={18} /> {leaveBalance ? leaveBalance - (leaveDays) || leaveBalance : startDate && endDate ? leaveTypes.find(type => type.id === selectedLeaveType)?.maxDays! - (leaveDays) : leaveTypes.find(type => type.id === selectedLeaveType)?.maxDays}</p>
 
         </div>
         <div>

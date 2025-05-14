@@ -1,4 +1,6 @@
-import React from "react";
+// app/admin/(dashboard)/page.tsx
+import HRAdminDashboard from "@/components/HRAdminDashboard"; // Adjust the path if necessary
+
 export default function Page() {
-    return (<h1>Admin Dashboard</h1>);
+  return <HRAdminDashboard />;
 }

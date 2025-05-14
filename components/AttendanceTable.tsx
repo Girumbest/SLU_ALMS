@@ -661,7 +661,7 @@ const handlePrint = () => {
                     {(supId && settings?.find(item => item.key === 'check_out_enabled')?.value! === 'true' || !supId) &&
                     <button
                       // href={`./employees/edit/${employee.username}`}
-                      disabled={employee.attendances[0]?.status === "ON_LEAVE"}
+                      disabled={employee.attendances[0]?.status === "ON_LEAVE" || employee?.leaveRequests?.length > 0}
                       className="text-green-600 hover:text-green-800 mx-1"
                       onClick={(e) =>
                         openAttendanceEditModal(
