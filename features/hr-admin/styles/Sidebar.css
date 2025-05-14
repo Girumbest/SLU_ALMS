@@ -1,0 +1,10 @@
+.hide-scrollbar {
+    overflow-y: auto; /* Or 'scroll' if you always want the scrollbar gutter */
+    scrollbar-width: none; /* For Firefox */
+    -ms-overflow-style: none;  /* For Internet Explorer and Edge */
+  }
+  
+  .hide-scrollbar::-webkit-scrollbar {
+    display: none; /* For Chrome, Safari, and Opera */
+  }
+  

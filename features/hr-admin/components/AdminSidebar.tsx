@@ -9,7 +9,7 @@ import { useRouter, usePathname } from "next/navigation";
 import Image from "next/image";
 import { signOut, useSession } from 'next-auth/react';
 import Link from "next/link";
-import { ClipLoader } from "react-spinners";
+import "../styles/Sidebar.css"
 
 interface MenuItem {
   name: string;
@@ -92,6 +92,18 @@ const AdminSidebar = () => {
     if (menuItem.name === "Leave Requests" && 
         pathname.startsWith("/admin/leave/") && 
         pathname !== "/admin/leave/leave-types") {
+      return true;
+    }
+
+    // Handle /admin/departments/[id]
+    if (menuItem.name === "Departments" && 
+        pathname.startsWith("/admin/departments/")) {
+      return true;
+    }
+
+    // Handle /admin/attendance/[id]
+    if (menuItem.name === "Attendance" && 
+        pathname.startsWith("/admin/attendance/")) {
       return true;
     }
     
@@ -185,7 +197,7 @@ const AdminSidebar = () => {
       {/* Header */}
       <div className="p-4 flex items-center justify-between border-b border-gray-700">
         {!isCollapsed && (
-          <div className="flex items-center">
+          <div className="flex items-center justify-between">
             <Image 
               src="/logo.png" 
               alt="Logo" 
@@ -207,7 +219,7 @@ const AdminSidebar = () => {
       </div>
 
       {/* Navigation */}
-      <nav className="flex-1 overflow-y-auto py-2 scrollbar-thin scrollbar-thumb-gray-700 scrollbar-track-gray-900">
+      <nav className="flex-1 overflow-y-auto py-2 scrollbar-thumb-gray-700 scrollbar-track-gray-900 hide-scrollbar">
         {renderMenuItems(menus)}
       </nav>
 

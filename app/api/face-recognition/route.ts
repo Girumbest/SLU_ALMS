@@ -1,6 +1,6 @@
 // app/api/face-recognition/route.ts
 import { NextResponse } from 'next/server';
-import { FaceMatcher } from 'face-api.js';
+import { FaceMatcher, LabeledFaceDescriptors } from 'face-api.js';
 import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth';
 import { prisma } from '@/lib/db';
@@ -12,20 +12,34 @@ export async function POST(request: Request) {
     const session = await getServerSession(authOptions);
     if (!session || session.user?.role !== "Employee") {
       return NextResponse.json(
-        { error: "Unauthorized" },
+        { 
+          matched: false,
+          distance: 0,
+          message: "Unauthorized",
+          user: null
+        },
         { status: 401 }
       );
     }
 
-    // Get employee face descriptor
+    // Get employee data including face descriptor
     const employee = await prisma.user.findUnique({
-      where: { id: session.user.id },
-      select: { faceDescriptor: true },
+      where: { id: Number(session.user.id) },
+      select: { 
+        faceDescriptor: true,
+        firstName: true,
+        id: true
+      },
     });
 
     if (!employee?.faceDescriptor) {
       return NextResponse.json(
-        { error: "No face descriptor registered for this user" },
+        { 
+          matched: false,
+          distance: 0,
+          message: "No face descriptor registered for this user",
+          user: null
+        },
         { status: 400 }
       );
     }
@@ -34,19 +48,28 @@ export async function POST(request: Request) {
     const { descriptor } = await request.json();
     if (!descriptor || !Array.isArray(descriptor)) {
       return NextResponse.json(
-        { error: "Invalid face descriptor format" },
+        { 
+          matched: false,
+          distance: 0,
+          message: "Invalid face descriptor format",
+          user: null
+        },
         { status: 400 }
       );
     }
 
-    // Create face matcher with the employee's descriptor
-    const faceMatcher = new FaceMatcher([{
-      label: session.user.id,
-      descriptors: [new Float32Array(employee.faceDescriptor)]
-    }]);
-
-    // Compare faces
+    // Convert stored descriptor to Float32Array
+    const storedDescriptor = new Float32Array(employee.faceDescriptor);
     const inputDescriptor = new Float32Array(descriptor);
+
+    // Create labeled face descriptors (required by FaceMatcher)
+    const labeledDescriptors = new LabeledFaceDescriptors(
+      session.user.id,
+      [storedDescriptor]
+    );
+
+    // Create face matcher with the employee's descriptor
+    const faceMatcher = new FaceMatcher([labeledDescriptors]);
     const bestMatch = faceMatcher.findBestMatch(inputDescriptor);
     const matched = bestMatch.distance < 0.5; // Adjust threshold as needed
 
@@ -55,27 +78,38 @@ export async function POST(request: Request) {
         { 
           matched: false,
           distance: bestMatch.distance,
-          message: "Face not recognized" 
+          message: "Face not recognized",
+          user: null
         },
         { status: 200 }
       );
     }
 
     // Register attendance if matched
-    // const { status, message } = await registerAttendance(session.user.id, new Date());
-    const {status, message} = {status: "success", message: ""}
-    if (status !== "success") {
+    const attendanceResult = {status: "success", message: "Attendance registered"}//await registerAttendance(session.user.id, new Date());
+
+    // const attendanceResult = await registerAttendance(session.user.id, new Date());
+    if (attendanceResult.status !== "success") {
       return NextResponse.json(
-        { error: message || "Failed to register attendance" },
+        { 
+          matched: false,
+          distance: bestMatch.distance,
+          message: attendanceResult.message || "Failed to register attendance",
+          user: null
+        },
         { status: 400 }
       );
     }
 
     return NextResponse.json(
       { 
-        success: true,
-        message: "Attendance registered successfully",
-        distance: bestMatch.distance
+        matched: true,
+        distance: bestMatch.distance,
+        message: "Face recognized and attendance registered",
+        user: {
+          id: employee.id,
+          name: employee.firstName
+        }
       },
       { status: 200 }
     );
@@ -83,7 +117,12 @@ export async function POST(request: Request) {
   } catch (error) {
     console.error('Face recognition error:', error);
     return NextResponse.json(
-      { error: 'Internal server error' },
+      { 
+        matched: false,
+        distance: 0,
+        message: 'Internal server error',
+        user: null
+      },
       { status: 500 }
     );
   }

@@ -66,6 +66,7 @@ const CameraCapture: React.FC<CameraCaptureProps> = ({ onCapture }) => {
       <video ref={videoRef} autoPlay className="w-full h-48 object-cover rounded-md"></video>
       <button
         onClick={captureImage}
+        type='button'
         className="mt-2 bg-blue-500 text-white py-2 px-4 rounded-md hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500"
       >
         Capture

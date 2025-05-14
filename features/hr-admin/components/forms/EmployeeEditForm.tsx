@@ -229,7 +229,7 @@ export function EmployeeEditForm({ employee, departments }: EmployeeEditFormProp
           },
         }
         );
-      return;
+        formData.set("photograph","") //Normalize
     }
 
     //If not selected set the file type to '' for zod validation / Normalize empty file inputs

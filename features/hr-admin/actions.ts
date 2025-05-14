@@ -490,7 +490,10 @@ export async function getEmployees(
     const employees = await prisma.user.findMany({
       skip: (page - 1) * employeesPerPage,
       take: employeesPerPage,
-      //_count
+      
+      orderBy: {
+        createdAt: "desc",
+      },
       select: {
         id: true,
         firstName: true,
@@ -637,6 +640,9 @@ export async function getDepartmentEmployees(
       },
       select: {
         users: {
+          orderBy: {
+            createdAt: "desc",
+          },
           select: {
             id: true,
             firstName: true,
@@ -799,6 +805,9 @@ export async function getEmployeesAttendance(
     where: {
       departmentId: supervisor ? supervisor?.department?.id : undefined,
     },
+    orderBy: {
+      updatedAt: "desc",
+    },
     select: {
       id: true,
       firstName: true,
@@ -817,6 +826,7 @@ export async function getEmployeesAttendance(
             gte: (await formatDate(date)).startOfDay,
           },
         },
+        
         select: {
           id: true,
           morningCheckInTime: true,
@@ -936,7 +946,6 @@ export async function getAllAttendance(
     where: {
       id: empId,
     },
-
     select: {
       id: true,
       firstName: true,
@@ -949,6 +958,7 @@ export async function getAllAttendance(
         },
       },
       attendances: {
+
         skip: (page - 1) * attendancesPerPage,
         take: attendancesPerPage,
         where: whereClause,
@@ -1053,6 +1063,9 @@ export async function getAllAttendance(
 //------------LEAVES-------------------------------
 export async function getLeaveRequests(empId?: number, depId?: number) {
   const leaveRequests = await prisma.leaveRequest.findMany({
+    orderBy: {
+      updatedAt: "desc",
+    },
     where: empId
       ? {
           userId: empId,
@@ -1097,6 +1110,9 @@ export async function getLeaveRequests(empId?: number, depId?: number) {
 
 export async function getLeaveTypes() {
   const leaveTypes = await prisma.leaveType.findMany({
+    orderBy: {
+      updatedAt: "desc",
+    },
     select: {
       id: true,
       name: true,
@@ -1429,8 +1445,23 @@ export async function rejectLeave(leaveId: number){
     };
   }
 }
+async function isOnLeave(empId:number){
+  const leaveRequests = await prisma.leaveRequest.findMany({
+    orderBy:{
+      updatedAt: "desc",
+    },
+    where: {
+      userId: empId,
+      status: "APPROVED",
+    },
+  });
+  if(leaveRequests && leaveRequests[0].endDate > new Date()){
+    return true
+  }
+  return false
+}
 //----------------------------LEAVES END-------------------------------
-//Not sure if i'm using this function somewhere(forgot why it's created!)
+//Not sure if i'm using this function somewhere(forgot why it's created!)x
 async function getEmployeeAttendance(empId: number, date: Date) {
   if (!(await isWorkingDay(date))) {
     console.log("NOT A WORKING DAY");
@@ -1470,6 +1501,233 @@ async function getEmployeeAttendance(empId: number, date: Date) {
   });
   return atten;
 }
+
+//employee page
+export async function registerAttendanceByEmployee(id: number, status=false){
+  if (!(await isWorkingDay())) {
+    console.log("NOT A WORKING DAY");
+    return { errorMsg: "Not a working day", isWorkingDay: false };
+  }
+  if((await isOnLeave(id))){
+    return {errorMsg: "Employee is on leave", onLeave: true}
+  }
+
+  const settings = await prisma.settings.findMany({
+    where: {
+      key: {
+        in: ["check_out_enabled", "attendance_time"],
+      },
+    },
+    select: {
+      key: true,
+      value: true,
+      type: true,
+    },
+  });
+  const attendanceTimeSetting = JSON.parse(
+    settings.find((item) => item.key === "attendance_time")!.value as string
+  ) as any;
+  // Attendance Time Settings
+  const morningCheckInTime = timeStringToMinutes(
+    attendanceTimeSetting.check_in.morning
+  );
+  const morningCheckOutTime = timeStringToMinutes(
+    attendanceTimeSetting.check_out.morning
+  );
+  const afternoonCheckInTime = timeStringToMinutes(
+    attendanceTimeSetting.check_in.afternoon
+  );
+  const afternoonCheckOutTime = timeStringToMinutes(
+    attendanceTimeSetting.check_out.afternoon
+  );
+  const checkInThreshold = Number(attendanceTimeSetting.check_in.threshold); //In Mins
+  const checkOutThreshold = Number(attendanceTimeSetting.check_out.threshold); //In Mins
+  const checkOutEnabled =
+    settings.find((item) => item.key === "check_out_enabled")?.value === "true";
+
+  const now = new Date().getHours() * 60 + new Date().getMinutes();
+  const timeOfTheDay = (morningCheckInTime + checkInThreshold) < now && (now < (morningCheckOutTime - checkOutThreshold)) ? "morning" : (afternoonCheckInTime + checkInThreshold) < now && (now < (afternoonCheckOutTime - checkOutThreshold)) ? "afternoon" : ""
+  if(timeOfTheDay === ""){
+    return {
+      errorMsg: "Not within attendance time",
+      isWorkingDay: true,
+      attendanceTime: {
+        morningCheckIn: attendanceTimeSetting.check_in.morning,
+        morningCheckOut: attendanceTimeSetting.check_out.morning,
+        afternoonCheckIn: attendanceTimeSetting.check_in.afternoon,
+        afternoonCheckOut: attendanceTimeSetting.check_out.afternoon,
+      },
+    };
+  }
+  const attendance = await prisma.attendance.findFirst({
+    where: {
+      AND: [
+        {
+          userId: id,
+        },
+        {
+          date: {
+            lte: (await formatDate(new Date())).endOfDay,
+            gte: (await formatDate(new Date())).startOfDay,
+          },
+        },
+      ],
+    },
+    select: {
+      id: true,
+      morningCheckInTime: true,
+      morningCheckOutTime: true,
+      afternoonCheckInTime: true,
+      afternoonCheckOutTime: true,
+      checkOutEnabled: true,
+      status: true,
+      date: true,
+    },
+  });
+
+  if(status){
+    return{
+      timeOfTheDay,
+      attendance,
+      checkOutEnabled,
+      lateClockInEnabled: settings.find((item) => item.key === "late_check_in_allowed")!.value === "true",
+      isLateForClockIn: timeOfTheDay && timeOfTheDay === "morning" && (morningCheckInTime + checkInThreshold) < now || timeOfTheDay && timeOfTheDay === "afternoon" && (afternoonCheckInTime + checkInThreshold) < now,
+      isEarlyForClockOut: timeOfTheDay && timeOfTheDay === "afternoon" && (afternoonCheckOutTime - checkOutThreshold) > now || timeOfTheDay && timeOfTheDay === "morning" && (morningCheckOutTime - checkOutThreshold) > now,
+    }
+  }
+
+  const determineClockAction = () => {
+    // if(timeOfTheDay === "morning"){
+    //   if(attendance?.morningCheckOutTime){
+    //     return {errorMsg: "Already checked out for morning"}
+    //   }
+    //   return "clock_out"
+    // }
+    // if(timeOfTheDay === "afternoon"){
+    //   if(attendance?.afternoonCheckOutTime){
+    //     return {errorMsg: "Already checked out for afternoon"}
+    //   }
+    //   return "clock_out"
+    // }
+    // return "clock_in"
+    if(timeOfTheDay === "morning" && attendance?.morningCheckInTime && checkOutEnabled || 
+      timeOfTheDay === "afternoon" && attendance?.afternoonCheckInTime && checkOutEnabled){
+        return 'clock_out'
+    }
+    return 'clock_in'
+  }
+  const type = determineClockAction();
+  if(type === "clock_in"){
+    if(timeOfTheDay === "morning"){
+      if(attendance?.morningCheckInTime){
+        return {errorMsg: "Already checked in for morning"}
+      }
+      await prisma.attendance.create({
+        data: {
+          userId: id,
+          date: new Date(),
+          morningCheckInTime: new Date(),
+          isLateMorningCheckIn: morningCheckInTime + checkInThreshold < now,
+          status: "PRESENT",
+          checkOutEnabled,
+        },
+      });
+    }
+    if(timeOfTheDay === "afternoon"){
+      // if(!attendance?.morningCheckInTime || !attendance?.morningCheckOutTime){
+      //   return {errorMsg: "Check in for morning first"}
+      // }
+      if(attendance?.afternoonCheckInTime){
+        return {errorMsg: "Already checked in for afternoon"}
+      }
+      if(attendance){
+      await prisma.attendance.update({
+        where: {
+          id: attendance.id,
+        },
+        data: {
+          afternoonCheckInTime: new Date(),
+          isLateAfternoonCheckIn: afternoonCheckInTime + checkInThreshold < now,
+        },
+      });
+    }else{
+      await prisma.attendance.create({
+        data: {
+          userId: id,
+          date: new Date(),
+          afternoonCheckInTime: new Date(),
+          isLateAfternoonCheckIn: afternoonCheckInTime + checkInThreshold < now,
+          checkOutEnabled,
+          status: "PRESENT",
+        }
+      })
+    }
+    }
+  }
+  if(type === "clock_out" && checkOutEnabled){
+    // if(!attendance?.morningCheckInTime){
+    //   return {errorMsg: "Check in for morning first"}
+    // }
+    if(timeOfTheDay === "morning"){
+      if(!attendance?.morningCheckInTime){
+        return {errorMsg: "Check in for morning first"}
+      }
+      if(!attendance?.morningCheckOutTime){
+        await prisma.attendance.update({
+          where: {
+            id: attendance.id,
+          },
+          data: {
+            morningCheckOutTime: new Date(),
+            isEarlyMorningCheckOut: morningCheckOutTime - checkOutThreshold > now,
+            checkOutEnabled: true,
+          },
+        });
+      }else{
+        return {errorMsg: "Already checked out for morning"}
+      }
+    }
+    if(timeOfTheDay === "afternoon"){
+      if(!attendance?.afternoonCheckInTime){
+        return {errorMsg: "Check in for afternoon first"}
+      }
+      if(!attendance?.afternoonCheckOutTime){
+        await prisma.attendance.update({
+          where: {
+            id: attendance.id,
+          },
+          data: {
+            afternoonCheckOutTime: new Date(),
+            isEarlyAfternoonCheckOut: afternoonCheckOutTime - checkOutThreshold > now,
+          },
+        });
+      }else{
+        return {errorMsg: "Already checked out for afternoon"}
+      }
+    }
+  }
+  revalidatePath("/dashboard");
+  return { successMsg: "Attendance registered successfully!" };
+}
+export async function getEmployeeAttendanceHistory(id: number){
+  const attendance = await prisma.attendance.findMany({
+    where: {
+      userId: id,
+    },
+    select: {
+      id: true,
+      morningCheckInTime: true,
+      morningCheckOutTime: true,
+      afternoonCheckInTime: true,
+      afternoonCheckOutTime: true,
+      date: true,
+      status: true,
+    },
+  });
+  return attendance
+}
+//------------
+
 
 export async function registerAttendance(
   prevState: UserFormState,
@@ -1757,7 +2015,7 @@ export async function registerAttendance(
     revalidatePath(`/admin/attendance/${empId}`);
 
     return { successMsg: "Attendance registered successfully!" };
-  }
+}
 
 
 //Calendar
@@ -1772,6 +2030,7 @@ export async function fetchEvents() {
   }
 }
 
+//create or update event
 export async function saveEvent(eventData: Event, eventId?: number) {
   try {
     const { eventName, eventDate, isRecurring, eventType, description} =
@@ -1792,7 +2051,7 @@ export async function saveEvent(eventData: Event, eventId?: number) {
           eventType,
           description,
           recurringType,
-          eventEnd
+          eventEnd: eventEnd || undefined
         },
       });
       revalidatePath("/admin/calendar");

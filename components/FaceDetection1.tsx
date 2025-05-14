@@ -1,10 +1,13 @@
-// components/FaceRecognition.tsx
 "use client";
 
 import { useEffect, useRef, useState } from 'react';
 import * as faceapi from 'face-api.js';
 
-type FaceDescriptor = Float32Array;
+interface FaceRecognitionProps {
+  onSuccess: (userId: string) => void;
+  onClose: () => void;
+}
+
 type FaceMatchResult = {
   user?: {
     id: string;
@@ -14,16 +17,16 @@ type FaceMatchResult = {
   matched: boolean;
 };
 
-export default function FaceRecognition() {
+export default function FaceRecognition({ onSuccess, onClose }: FaceRecognitionProps) {
   const videoRef = useRef<HTMLVideoElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const [recognitionStatus, setRecognitionStatus] = useState<string>('Loading models...');
-  const [recognizedUser, setRecognizedUser] = useState<{name: string} | null>(null);
-  const [recognitionComplete, setRecognitionComplete] = useState(false);
+  const [isRecognized, setIsRecognized] = useState(false);
+  const [recognizedUser, setRecognizedUser] = useState<{id: string, name: string} | null>(null);
   const streamRef = useRef<MediaStream | null>(null);
 
   // Function to send face descriptor to server
-  const compareFaceDescriptor = async (descriptor: FaceDescriptor): Promise<FaceMatchResult> => {
+  const compareFaceDescriptor = async (descriptor: Float32Array): Promise<FaceMatchResult> => {
     try {
       const response = await fetch('/api/face-recognition', {
         method: 'POST',
@@ -37,7 +40,8 @@ export default function FaceRecognition() {
         throw new Error('Face recognition API error');
       }
 
-      return await response.json();
+      const data = await response.json();
+      return data;
     } catch (error) {
       console.error('Error comparing face:', error);
       return { distance: 0, matched: false };
@@ -49,7 +53,6 @@ export default function FaceRecognition() {
       streamRef.current.getTracks().forEach(track => track.stop());
       streamRef.current = null;
     }
-    setRecognitionComplete(true);
   };
 
   useEffect(() => {
@@ -61,8 +64,6 @@ export default function FaceRecognition() {
         await faceapi.nets.tinyFaceDetector.loadFromUri('/models');
         await faceapi.nets.faceLandmark68Net.loadFromUri('/models');
         await faceapi.nets.faceRecognitionNet.loadFromUri('/models');
-        await faceapi.nets.faceExpressionNet.loadFromUri('/models');
-        
         setRecognitionStatus('Starting camera...');
         await startVideo();
       } catch (error) {
@@ -73,7 +74,9 @@ export default function FaceRecognition() {
 
     const startVideo = async () => {
       try {
-        const stream = await navigator.mediaDevices.getUserMedia({ video: true });
+        const stream = await navigator.mediaDevices.getUserMedia({ 
+          video: { width: 720, height: 560 } 
+        });
         streamRef.current = stream;
         if (videoRef.current) {
           videoRef.current.srcObject = stream;
@@ -85,23 +88,22 @@ export default function FaceRecognition() {
     };
 
     const onPlay = async () => {
-      if (!videoRef.current || !canvasRef.current || recognitionComplete) return;
+      if (!videoRef.current || !canvasRef.current || isRecognized) return;
 
       const video = videoRef.current;
       const canvas = canvasRef.current;
 
       // Set canvas dimensions to match video
-      canvas.width = video.width;
-      canvas.height = video.height;
+      canvas.width = video.videoWidth;
+      canvas.height = video.videoHeight;
 
-      const displaySize = { width: video.width, height: video.height };
+      const displaySize = { width: video.videoWidth, height: video.videoHeight };
       faceapi.matchDimensions(canvas, displaySize);
 
       let lastSentTime = 0;
 
       intervalId = setInterval(async () => {
         try {
-          // Detect faces with landmarks and descriptors
           const detections = await faceapi.detectAllFaces(
             video,
             new faceapi.TinyFaceDetectorOptions()
@@ -110,33 +112,32 @@ export default function FaceRecognition() {
           .withFaceDescriptors();
 
           if (detections.length > 0) {
-            setRecognitionStatus('Face detected');
+            setRecognitionStatus('Face detected - verifying...');
             
-            // Get the first face's descriptor
             const currentDescriptor = detections[0].descriptor;
-            
-            // Only send to server every 2 seconds
             const now = Date.now();
+            
             if (now - lastSentTime > 2000) {
               lastSentTime = now;
               const matchResult = await compareFaceDescriptor(currentDescriptor);
               
               if (matchResult.matched && matchResult.user) {
-                setRecognizedUser({ name: matchResult.user.name });
-                stopVideoStream(); // Stop stream on successful recognition
+                setRecognizedUser(matchResult.user);
+                setIsRecognized(true);
+                stopVideoStream();
                 clearInterval(intervalId);
+                onSuccess(matchResult.user.id);
                 return;
               } else {
-                setRecognizedUser(null);
+                setRecognitionStatus('Face not recognized');
               }
             }
           } else {
             setRecognitionStatus('No face detected');
-            setRecognizedUser(null);
           }
 
-          // Draw detections if not complete
-          if (!recognitionComplete) {
+          // Draw detections if not recognized
+          if (!isRecognized) {
             const resizedDetections = faceapi.resizeResults(detections, displaySize);
             const context = canvas.getContext('2d');
             if (context) {
@@ -151,12 +152,10 @@ export default function FaceRecognition() {
       }, 100);
     };
 
-    if (!recognitionComplete) {
-      loadModels();
-    }
+    loadModels();
 
     const video = videoRef.current;
-    if (video && !recognitionComplete) {
+    if (video) {
       video.addEventListener('play', onPlay);
     }
 
@@ -167,54 +166,66 @@ export default function FaceRecognition() {
       }
       stopVideoStream();
     };
-  }, [recognitionComplete]);
-
-  if (recognitionComplete && recognizedUser) {
-    return (
-      <div className="flex flex-col items-center justify-center min-h-screen bg-gray-100 p-4">
-        <div className="w-full max-w-md p-8 bg-white rounded-lg shadow-lg text-center">
-          <div className="w-20 h-20 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-4">
-            <svg className="w-10 h-10 text-green-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M5 13l4 4L19 7"></path>
-            </svg>
-          </div>
-          <h2 className="text-2xl font-bold text-gray-800 mb-2">Welcome back!</h2>
-          <p className="text-xl text-gray-600 mb-6">Hello, {recognizedUser.name}</p>
-          <p className="text-gray-500">Face recognition successful</p>
-        </div>
-      </div>
-    );
-  }
+  }, [isRecognized, onSuccess]);
 
   return (
-    <div className="flex flex-col items-center justify-center min-h-screen bg-gray-100 p-4">
-      <div className="relative w-full max-w-3xl">
-        {!recognitionComplete && (
-          <>
-            <video 
-              ref={videoRef} 
-              width={720} 
-              height={560} 
-              autoPlay 
-              muted 
-              playsInline
-              className="w-full rounded-lg shadow-lg"
-            />
-            <canvas 
-              ref={canvasRef} 
-              className="absolute top-0 left-0 w-full h-full rounded-lg"
-            />
-          </>
-        )}
+    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+      <div className="bg-white rounded-lg p-6 max-w-4xl w-full mx-4">
+        <div className="flex justify-between items-center mb-4">
+          <h2 className="text-xl font-semibold">Face Recognition</h2>
+          <button 
+            onClick={onClose}
+            className="text-gray-500 hover:text-gray-700"
+          >
+            <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+            </svg>
+          </button>
+        </div>
 
-        <div className="mt-6 p-4 bg-white rounded-lg shadow-md w-full max-w-3xl">
-          <h2 className="text-xl font-semibold mb-2">Recognition Status</h2>
+        <div className="relative w-full aspect-video bg-black rounded-lg overflow-hidden">
+          {!isRecognized ? (
+            <>
+              <video 
+                ref={videoRef} 
+                autoPlay 
+                muted 
+                playsInline
+                className="w-full h-full object-cover"
+              />
+              <canvas 
+                ref={canvasRef} 
+                className="absolute top-0 left-0 w-full h-full"
+              />
+            </>
+          ) : (
+            <div className="flex flex-col items-center justify-center h-full p-4 text-center">
+              <div className="w-20 h-20 bg-green-100 rounded-full flex items-center justify-center mb-4">
+                <svg xmlns="http://www.w3.org/2000/svg" className="h-10 w-10 text-green-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                </svg>
+              </div>
+              <h3 className="text-xl font-semibold mb-1">Successfully Recognized</h3>
+              {recognizedUser && (
+                <p className="text-gray-600">Welcome, {recognizedUser.name}</p>
+              )}
+              <button
+                onClick={onClose}
+                className="mt-6 px-4 py-2 bg-blue-500 text-white rounded hover:bg-blue-600 transition-colors"
+              >
+                Continue
+              </button>
+            </div>
+          )}
+        </div>
+
+        <div className="mt-4 p-3 bg-gray-50 rounded-lg">
           <div className="flex items-center">
             <div className={`w-3 h-3 rounded-full mr-2 ${
-              recognizedUser ? 'bg-green-500' : 
+              isRecognized ? 'bg-green-500' : 
               recognitionStatus.includes('detected') ? 'bg-yellow-500' : 'bg-gray-500'
             }`}></div>
-            <p>{recognitionStatus}</p>
+            <p className="text-sm">{recognitionStatus}</p>
           </div>
         </div>
       </div>
