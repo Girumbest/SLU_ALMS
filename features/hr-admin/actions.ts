@@ -30,12 +30,31 @@ async function session() {
 
 export async function getDashboardSummary(): Promise<DashboardSummary> {
   try {
-    const totalEmployees = 0//await /* query to get total employees */;
-    const totalDepartments = 0//await /* query to get total departments */;
-    const pendingLeaveRequests = 0//await /* query for pending leave requests */;
-    const approvedLeaveRequests = 0//await /* query for approved leave requests */;
-    const rejectedLeaveRequests = 0//await /* query for rejected leave requests */;
-    const totalLeaveTypes = 0//await /* query to get total leave types */;
+    const totalEmployees = await prisma.user.count(); /* query to get total employees */;
+    const totalDepartments = await prisma.department.count(); /* query to get total departments */;
+    const pendingLeaveRequests = await prisma.leaveRequest.count({
+      where: {
+        status: "PENDING",
+      },
+    })
+    //await /* query for pending leave requests */;
+    const approvedLeaveRequests = await prisma.leaveRequest.count({
+      where: {
+        status: "APPROVED",
+      },
+    })
+    //await
+     /* query for approved leave requests */;
+    const rejectedLeaveRequests = await prisma.leaveRequest.count({
+      where: {
+        status: "REJECTED",
+      },
+    })
+    //await
+     /* query for rejected leave requests */;
+      /* query for rejected leave requests */;
+    const totalLeaveTypes = await prisma.leaveType.count()
+    /* query to get total leave types */;
 
     return {
       totalEmployees,
