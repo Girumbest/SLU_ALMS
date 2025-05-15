@@ -1235,6 +1235,11 @@ export async function createLeaveRequest(
         errorMsg: "Validation failed.",
       };
     }
+    if((await isOnLeave(Number(user?.id)))){
+      return {
+        errorMsg: "You can't request another leave while you'r on a leave!",
+      };
+    }
 
     // Validate the data (add more validation as needed)
     if (!empId || !leaveTypeId || !startDate || !endDate || !reason) {
@@ -1481,6 +1486,58 @@ export async function rejectLeave(leaveId: number){
     };
   }
 }
+export async function cancelLeave(leaveId: number){
+  try{
+
+    const user = (await session())?.user;
+    if(user?.role !== "Employee"){
+      return {
+        errorMsg: "Validation failed.",
+      };
+    }
+    const leave = await prisma.leaveRequest.findUnique({
+      where: {
+        id: leaveId,
+      },
+      select: {
+        userId: true,
+        leaveTypeId: true,
+        startDate: true,
+        endDate: true,
+        status: true
+      },
+    });
+    if(!leave) return {errorMsg: "Leave request not found."}
+    if(leave.status !== "PENDING") return {errorMsg: "Can't cancel approved leave request."}
+    const leaveDays = await calculateLeaveDays(leave?.startDate as Date, leave?.endDate as Date);
+    await prisma.leaveBalance.update({
+      where: {
+        userId_leaveTypeId: {
+          userId: leave?.userId,
+          leaveTypeId: leave?.leaveTypeId,
+        },
+        },
+      data: {
+        balance: {
+          increment: leaveDays,
+        },
+      },
+    });
+    await prisma.leaveRequest.delete({
+      where: {
+        id: leaveId,
+      },
+    });
+    revalidatePath("/leave/history");
+    return { successMsg: "Leave request canceled successfully!" };
+  }catch(error){
+    console.error("Error canceling leave request:", error);
+    return {
+      errorMsg: "Failed to cancel leave request.",
+    };
+  }
+}
+
 async function isOnLeave(empId:number){
   const leaveRequests = await prisma.leaveRequest.findMany({
     orderBy:{

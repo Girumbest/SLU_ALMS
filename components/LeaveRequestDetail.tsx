@@ -10,9 +10,11 @@ import {
   FaThumbsUp,
   FaPrint,
   FaFilePdf,
+  FaCross,
+  FaTimes,
 } from "react-icons/fa";
 import DateRangePicker from "./DateRangePicker";
-import { approveLeave, getEmployees, getLeaveRequests, getSettings, rejectLeave } from "@/features/hr-admin/actions";
+import { approveLeave, cancelLeave, getEmployees, getLeaveRequests, getSettings, rejectLeave } from "@/features/hr-admin/actions";
 import { useSession } from "next-auth/react";
 import { ClipLoader, PropagateLoader } from "react-spinners";
 import toast from "react-hot-toast";
@@ -94,6 +96,20 @@ const LeaveRequestDetailTable: React.FC<EmployeeTableProps> = ({ departments, em
       });
     }
   };
+  const [cancelActionLoading, seCancelActionLoading] = useState(false)
+  const handleLeaveCancel = async (leaveId: number) => {
+    seCancelActionLoading(true);
+    const leaveCancel = await cancelLeave(leaveId);
+    if(leaveCancel?.successMsg){
+      toast.success(leaveCancel.successMsg)
+      
+    }
+    if(leaveCancel?.errorMsg){
+      toast.error(leaveCancel.errorMsg)
+    }
+    seCancelActionLoading(false);
+  }
+
   const handleLeaveApprove = async (leaveId: number) => {
     setActionLoading(true);
     const leaveApprove = await approveLeave(leaveId);
@@ -532,7 +548,27 @@ const [isPrinting, setIsPrinting] = useState(false)
                     >
                       <FaEye size={18} />
                     </Link> */}
-                    {leave.status.toLowerCase() === "pending" && (
+                    {leave.status.toLowerCase() === "pending" && session?.user.role === "Employee" && (
+                      <button
+                          // href={`./leave/edit/${leave.user.username}`}
+                          className="text-red-600 hover:text-red-800 mx-1"
+                          title="Cancel Leave Request"
+                          disabled={cancelActionLoading}
+                          onClick={e => handleLeaveCancel(leave.id)}
+                        >
+                          {!cancelActionLoading && <FaTimes size={18} />}
+                          <ClipLoader 
+                            loading={cancelActionLoading}
+                            size={18}
+                            color="red"
+                            cssOverride={{
+                              display: 'block',
+                              margin: '0 auto',
+                            }}
+                          />
+                        </button>
+                    )}
+                    {leave.status.toLowerCase() === "pending" && session?.user.role !== "Employee" && (
                       <>
                         <button
                           // href={`./leave/edit/${leave.user.username}`}
