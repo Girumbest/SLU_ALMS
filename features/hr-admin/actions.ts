@@ -1581,6 +1581,8 @@ export async function registerAttendanceByEmployee(id: number, status=false){
   const now = new Date().getHours() * 60 + new Date().getMinutes();
   const timeOfTheDay = (morningCheckInTime + checkInThreshold) < now && (now < (morningCheckOutTime - checkOutThreshold)) ? "morning" : (afternoonCheckInTime + checkInThreshold) < now && (now < (afternoonCheckOutTime - checkOutThreshold)) ? "afternoon" : ""
   if(timeOfTheDay === ""){
+    console.log("Time of the day", new Date().getHours())
+
     return {
       errorMsg: "Not within attendance time",
       isWorkingDay: true,
@@ -1743,7 +1745,7 @@ export async function registerAttendanceByEmployee(id: number, status=false){
   return { successMsg: "Attendance registered successfully!" };
 }
 export async function getEmployeeAttendanceHistory(id: number){
-  console.log("IDDDD", id)
+  
   const attendance = await prisma.attendance.findMany({
     orderBy: {
       date: "desc",

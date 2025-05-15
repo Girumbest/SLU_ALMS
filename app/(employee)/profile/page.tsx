@@ -4,11 +4,11 @@ import { getEmployeeByUsername } from "@/lib/db-ops";
 import { getServerSession } from "next-auth";
 
 
-export default async function EmployeePage({params}: {params:{employeeId:string}}) {
-  const employee = await getEmployeeByUsername((await params).employeeId)
-  const session = await getServerSession(authOptions)
+export default async function EmployeePage() {
+    const session = await getServerSession(authOptions)
+    const employee = session?.user && await getEmployeeByUsername(session?.user.name)
 
-  return session?.user?.department === employee?.department?.id.toString() ? (
+  return session?.user ? (
     <div className="p-8 bg-gray-100 min-h-screen">
       <EmployeeInfoCard employee={employee} />
     </div>

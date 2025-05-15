@@ -6,17 +6,20 @@ import {
 } from "react-icons/fa";
 import { useRouter, usePathname } from "next/navigation";
 import Image from "next/image";
-import { signOut } from 'next-auth/react';
+import { signOut, useSession } from 'next-auth/react';
+import Link from "next/link";
 
 const EmployeeSidebar = () => {
   const router = useRouter();
   const [isCollapsed, setIsCollapsed] = useState(false);
   const [isProfileOpen, setIsProfileOpen] = useState(false);
   const pathname = usePathname();
+  const {data:session, status: sessionStatus} = useSession();
+  
 
   const menuItems = [
-    { name: "Dashboard", icon: <FaHome />, path: "/admin/dashboard" },
-    { name: "Attendance", icon: <FaCalendarCheck />, path: "/attendance" },
+    // { name: "Dashboard", icon: <FaHome />, path: "/admin/dashboard" },
+    { name: "Attendance", icon: <FaCalendarCheck />, path: "/" },
     { name: "Request Leave", icon: <FaSitemap />, path: "/leave/request" },
     { name: "Leave History", icon: <FaCalendarTimes />, path: "/leave/history" },
     { name: "Calendar", icon: <FaCalendar />, path: "/calendar" },
@@ -35,7 +38,7 @@ const EmployeeSidebar = () => {
 
   return (
     <div className={`h-screen bg-gray-900 text-white flex flex-col transition-all duration-300 ${
-      isCollapsed ? "w-16" : "w-64"
+      isCollapsed ? "w-0" : "w-64"
     }`}>
       {/* Header */}
       <div className="p-4 flex items-center justify-between border-b border-gray-700">
@@ -49,12 +52,12 @@ const EmployeeSidebar = () => {
               className="rounded"
               priority
             />
-            <span className="ml-3 text-lg font-semibold">Employee Panel</span>
+            <span className="ml-3 text-lg font-semibold">SLU ALMS</span>
           </div>
         )}
         <button 
           onClick={() => setIsCollapsed(!isCollapsed)} 
-          className="text-xl hover:text-blue-400 transition-colors focus:outline-none"
+          className={`text-xl hover:text-blue-400 transition-colors focus:outline-none ${isCollapsed ? "absolute left-0 top-10  text-gray-600" : "relative"}`}
           aria-label={isCollapsed ? "Expand sidebar" : "Collapse sidebar"}
         >
           <FaBars />
@@ -62,7 +65,7 @@ const EmployeeSidebar = () => {
       </div>
 
       {/* Navigation */}
-      <nav className="flex-1 overflow-y-auto py-2">
+      <nav className={`flex-1 overflow-y-auto py-2 `}>
         {menuItems.map((item) => (
           <div
             key={item.name}
@@ -92,8 +95,8 @@ const EmployeeSidebar = () => {
           />
           {!isCollapsed && (
             <div className="ml-3">
-              <p className="font-medium">John Doe</p>
-              <p className="text-xs text-gray-400">Employee</p>
+              <p className="font-medium">{`@${session?.user.name}`}</p>
+              <p className="text-xs text-gray-400">{`${session?.user.role}`}</p>
             </div>
           )}
         </div>
@@ -112,14 +115,14 @@ const EmployeeSidebar = () => {
                 className="rounded-full"
               />
               <div className="ml-3">
-                <p className="font-medium">Name</p>
+                <p className="font-medium">{`@${session?.user.name}`}</p>
                 {/* <p className="text-sm text-gray-400">john.doe@example.com</p> */}
               </div>
             </div>
           </div>
-          <button className="w-full px-4 py-3 text-left hover:bg-gray-700 transition-colors">
+          <Link href={`/profile`} className="w-full px-4 py-3 text-left hover:bg-gray-700 transition-colors">
             View Profile
-          </button>
+          </Link>
           <button 
             className="w-full px-4 py-3 text-left hover:bg-gray-700 transition-colors border-t border-gray-700"
             onClick={() => {
@@ -127,7 +130,7 @@ const EmployeeSidebar = () => {
               setIsProfileOpen(false);
             }}
           >
-            Sign Out
+            Log Out
           </button>
         </div>
       )}
