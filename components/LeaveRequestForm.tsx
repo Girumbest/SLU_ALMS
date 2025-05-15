@@ -60,7 +60,7 @@ const LeaveRequestPage = () => {
   useEffect(() => {
     if (state.successMsg) {
       toast.success(state.successMsg);
-      router.push("/dashboard");
+      router.push("/leave/history");
     } else if (state.errorMsg) {
       toast.error(state.errorMsg);
     }

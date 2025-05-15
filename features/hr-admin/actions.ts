@@ -1265,9 +1265,12 @@ export async function createLeaveRequest(
       },
       select: {
         maxDays: true,
+        name: true
       },
     });
-
+    if(leaveType?.name === "Maternity Leave" && ((await prisma.user.findUnique({where:{id: Number(user.id)}, select:{gender:true}})) !== "Female")){
+      return {errorMsg: "You are a Man!"}
+    }
     if (!leaveBalance?.id) {
       if (leaveType.maxDays < days) {
         return {
