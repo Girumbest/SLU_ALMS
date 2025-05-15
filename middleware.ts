@@ -32,6 +32,11 @@ export async function middleware(req: NextRequest) {
   if (pathname.startsWith('/supervisor') && token.role !== 'Supervisor') {
     return NextResponse.redirect(new URL('/unauthorized', req.url));
   }
+  //remove this if something unexpected happens
+  if(pathname.startsWith('/') && token.role !== "Employee"){
+    const redirectPath = token.role === "HRAdmin" ? "/admin" : token.role === "Supervisor" ? "/supervisor" : "/unauthorized"
+      return NextResponse.redirect(new URL(redirectPath, req.url));
+  }
 
   return NextResponse.next();
 }
