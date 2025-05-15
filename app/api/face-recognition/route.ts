@@ -87,6 +87,7 @@ export async function POST(request: Request) {
 
     // Register attendance if matched
     const markAttendance = await registerAttendanceByEmployee(session.user.id);
+    console.log("attendance: ", markAttendance)
     const attendanceResult = {status: markAttendance.successMsg? "success" : "error", message: markAttendance?.errorMsg || "Attendance registered"}//await registerAttendanceByEmployee(session.user.id);
 
     // const attendanceResult = await registerAttendance(session.user.id, new Date());

@@ -1544,11 +1544,11 @@ async function isOnLeave(empId:number){
       updatedAt: "desc",
     },
     where: {
-      userId: empId,
+      userId: Number(empId),
       status: "APPROVED",
     },
   });
-  if(leaveRequests && leaveRequests[0].endDate > new Date()){
+  if(leaveRequests && leaveRequests[0]?.endDate > new Date()){
     return true
   }
   return false
@@ -1618,7 +1618,7 @@ export async function registerAttendanceByEmployee(id: number, status=false){
     },
   });
   const attendanceTimeSetting = JSON.parse(
-    settings.find((item) => item.key === "attendance_time")!.value as string
+    settings.find((item) => item.key === "attendance_time")!?.value as string
   ) as any;
   // Attendance Time Settings
   const morningCheckInTime = timeStringToMinutes(
@@ -1639,7 +1639,7 @@ export async function registerAttendanceByEmployee(id: number, status=false){
     settings.find((item) => item.key === "check_out_enabled")?.value === "true";
 
   const now = new Date().getHours() * 60 + new Date().getMinutes();
-  const timeOfTheDay = (morningCheckInTime + checkInThreshold) < now && (now < (morningCheckOutTime - checkOutThreshold)) ? "morning" : (afternoonCheckInTime + checkInThreshold) < now && (now < (afternoonCheckOutTime - checkOutThreshold)) ? "afternoon" : ""
+  const timeOfTheDay = (morningCheckInTime + checkInThreshold) < now && (now < (morningCheckOutTime - checkOutThreshold)) ? "morning" : (afternoonCheckInTime + checkInThreshold) < now && (now < (afternoonCheckOutTime+30 - checkOutThreshold)) ? "afternoon" : ""
   if(timeOfTheDay === ""){
     console.log("Time of the day", new Date().getHours())
 
@@ -1658,7 +1658,7 @@ export async function registerAttendanceByEmployee(id: number, status=false){
     where: {
       AND: [
         {
-          userId: id,
+          userId: Number(id),
         },
         {
           date: {
@@ -1685,7 +1685,7 @@ export async function registerAttendanceByEmployee(id: number, status=false){
       timeOfTheDay,
       attendance,
       checkOutEnabled,
-      lateClockInEnabled: settings.find((item) => item.key === "late_check_in_allowed")!.value === "true",
+      lateClockInEnabled: settings.find((item) => item.key === "late_check_in_allowed")!?.value === "true",
       isLateForClockIn: timeOfTheDay && timeOfTheDay === "morning" && (morningCheckInTime + checkInThreshold) < now || timeOfTheDay && timeOfTheDay === "afternoon" && (afternoonCheckInTime + checkInThreshold) < now,
       isEarlyForClockOut: timeOfTheDay && timeOfTheDay === "afternoon" && (afternoonCheckOutTime - checkOutThreshold) > now || timeOfTheDay && timeOfTheDay === "morning" && (morningCheckOutTime - checkOutThreshold) > now,
     }
@@ -1719,7 +1719,7 @@ export async function registerAttendanceByEmployee(id: number, status=false){
       }
       await prisma.attendance.create({
         data: {
-          userId: id,
+          userId: Number(id),
           date: new Date(),
           morningCheckInTime: new Date(),
           isLateMorningCheckIn: morningCheckInTime + checkInThreshold < now,
@@ -1748,7 +1748,7 @@ export async function registerAttendanceByEmployee(id: number, status=false){
     }else{
       await prisma.attendance.create({
         data: {
-          userId: id,
+          userId: Number(id),
           date: new Date(),
           afternoonCheckInTime: new Date(),
           isLateAfternoonCheckIn: afternoonCheckInTime + checkInThreshold < now,
@@ -1801,7 +1801,7 @@ export async function registerAttendanceByEmployee(id: number, status=false){
       }
     }
   }
-  revalidatePath("/dashboard");
+  revalidatePath("/");
   return { successMsg: "Attendance registered successfully!" };
 }
 export async function getEmployeeAttendanceHistory(id: number){
@@ -1811,7 +1811,7 @@ export async function getEmployeeAttendanceHistory(id: number){
       date: "desc",
     },
     where: {
-      userId: id,
+      userId: Number(id),
     },
     select: {
       id: true,
