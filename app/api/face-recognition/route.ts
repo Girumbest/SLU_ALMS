@@ -4,7 +4,7 @@ import { FaceMatcher, LabeledFaceDescriptors } from 'face-api.js';
 import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth';
 import { prisma } from '@/lib/db';
-import { registerAttendance } from '@/features/hr-admin/actions';
+import { registerAttendanceByEmployee } from '@/features/hr-admin/actions';
 
 export async function POST(request: Request) {
   try {
@@ -86,7 +86,8 @@ export async function POST(request: Request) {
     }
 
     // Register attendance if matched
-    const attendanceResult = {status: "success", message: "Attendance registered"}//await registerAttendance(session.user.id, new Date());
+    const markAttendance = await registerAttendanceByEmployee(session.user.id);
+    const attendanceResult = {status: markAttendance.successMsg? "success" : "error", message: markAttendance?.errorMsg || "Attendance registered"}//await registerAttendanceByEmployee(session.user.id);
 
     // const attendanceResult = await registerAttendance(session.user.id, new Date());
     if (attendanceResult.status !== "success") {
