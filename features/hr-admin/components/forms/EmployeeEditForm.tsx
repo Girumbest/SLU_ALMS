@@ -23,6 +23,7 @@ interface Employee {
     lastName: string;
     username: string;
     phoneNumber: string;
+    password: string;
     dateOfBirth: Date | null;
     gender: string;
     maritalStatus?: string | null;
@@ -306,7 +307,7 @@ export function EmployeeEditForm({ employee, departments }: EmployeeEditFormProp
 
 
           <FaLock className="input-icon" />
-          <input type={isHiddenPassword ? "password" : "text"} name="password" placeholder="Password" className="input" required onFocus={ e => e.target.value = generatePassword()}/>
+          <input type={isHiddenPassword ? "password" : "text"} defaultValue={employee.password} name="password" placeholder="Password" className="input" required onFocus={ e => {!e.target.value && (e.target.value = generatePassword())}}/>
           {isHiddenPassword ? <FaEye className="absolute right-3 text-gray-500 cursor-pointer" onClick={()=>setIsHiddenPassword(false)}/> : <FaEyeSlash className="absolute right-3 text-gray-500 cursor-pointer" onClick={()=>setIsHiddenPassword(true)}/>}
           {state.errors?.password && <p className="text-red-500 text-sm error-message">{state.errors.password [0]}</p>}
         </div>

@@ -50,7 +50,7 @@ export const config = {
      * - login page
      * - public assets (if any)
      */
-    '/((?!_next/static|_next/image|favicon.ico|login).*)',
+    '/((?!_next/static|_next/image|favicon.ico|logo.png|login).*)',
   ],
 };
 

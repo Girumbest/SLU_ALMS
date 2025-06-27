@@ -69,6 +69,60 @@ export async function getDashboardSummary(): Promise<DashboardSummary> {
     throw new Error("Failed to fetch dashboard summary");
   }
 }
+export async function getDepartmentDashboardSummary(): Promise<DashboardSummary> {
+  try {
+    const user = (await session())?.user
+    const departmentId = Number(user?.department)
+    const totalEmployees = await prisma.user.count({
+      where: { departmentId }
+    }); /* query to get total employees */;
+    const totalDepartments = await prisma.department.count(); /* query to get total departments */;
+    const pendingLeaveRequests = await prisma.leaveRequest.count({
+      where: {
+        status: "PENDING",
+        user: {
+          departmentId
+        }
+      },
+    })
+    //await /* query for pending leave requests */;
+    const approvedLeaveRequests = await prisma.leaveRequest.count({
+      where: {
+        status: "APPROVED",
+        user: {
+          departmentId
+        }
+      },
+    })
+    //await
+     /* query for approved leave requests */;
+    const rejectedLeaveRequests = await prisma.leaveRequest.count({
+      where: {
+        status: "REJECTED",
+        user: {
+          departmentId
+        }
+      },
+    })
+    //await
+     /* query for rejected leave requests */;
+      /* query for rejected leave requests */;
+    const totalLeaveTypes = await prisma.leaveType.count()
+    /* query to get total leave types */;
+
+    return {
+      totalEmployees,
+      totalDepartments,
+      pendingLeaveRequests,
+      approvedLeaveRequests,
+      rejectedLeaveRequests,
+      totalLeaveTypes,
+    };
+  } catch (error) {
+    console.error("Error fetching dashboard summary:", error);
+    throw new Error("Failed to fetch dashboard summary");
+  }
+}
 
 // export async function createUser(
 //   prevState: UserFormState,
@@ -806,6 +860,7 @@ export async function getDepartmentEmployees(
   };
 }
 
+
 //Get all employees attendance of selected date
 export async function getEmployeesAttendance(
   query = "",
@@ -815,6 +870,7 @@ export async function getEmployeesAttendance(
   date = new Date(),
   supId?: number
 ) {
+  console.log("DATE IN GET ATTENDANCE: ", date)
   if(!(await isWorkingDay(date))){
     console.log("NOT A WORKING DAY")
     return {errorMsg: "Not a working day", isWorkingDay: false}
@@ -847,14 +903,21 @@ export async function getEmployeesAttendance(
     },
   });
 
-
+  //--------------------------------------
+    const parts = new Date(date); // Parses as local
+    const selectedDateAsUTC = new Date(Date.UTC(parts.getFullYear(), parts.getMonth(), parts.getDate()));
+    date = selectedDateAsUTC
+    console.log("normalized date: ",date)
+    // console.log("compare: ",new Date("2025-05-23T10:40:06.911Z") < date)
+  //--------------------------------------
   const employees = await prisma.user.findMany({
     skip: employeesPerPage ? (page - 1) * employeesPerPage : undefined,
     take: employeesPerPage || undefined,
     where: {
       departmentId: supervisor ? supervisor?.department?.id : undefined,
+      
       createdAt: {
-        lte: date,
+        lte: (await formatDate(date)).endOfDay,
       }
     },
     orderBy: {
@@ -915,7 +978,7 @@ export async function getEmployeesAttendance(
   });
   const total = await prisma.user.count();
   (employees as any).total = total;
-
+  // console.log(employees)
   // console.log(employees[0].username, employees[0].attendances);
   return { employees, total, settings };
 }
@@ -1128,6 +1191,7 @@ export async function getLeaveRequests(empId?: number, depId?: number) {
       startDate: true,
       endDate: true,
       reason: true,
+      days: true,
       status: true,
       createdAt: true,
       leaveType: {
@@ -1206,6 +1270,22 @@ export async function editLeaveType(data:{
 }){
   console.log("UPDATE TYPE DATA: ",data)
   try{
+    const leaveType = await prisma.leaveType.findUnique({
+      where: {
+        id: data.id,
+      },
+    });
+    if(!leaveType) return {errorMsg: "Leave type not found."}
+    if(leaveType.name === "Annual Leave"){
+      return {errorMsg: "Annual Leave cannot be edited."}
+    }
+    if(leaveType.name === "Maternity Leave" && data.name !== "Maternity Leave"){
+      return {errorMsg: "Maternity Leave type name cannot be edited."}
+    }
+    if(leaveType.name === "Paternity Leave" && data.name !== "Paternity Leave"){
+      return {errorMsg: "Paternity Leave type name cannot be edited."}
+    }
+
     await prisma.leaveType.update({
       where: {
         id: data.id,
@@ -1223,6 +1303,68 @@ export async function editLeaveType(data:{
 }
 
 export async function getLeaveBalance(empId: number, leaveTypeId: number) {
+
+  const leaveType = await prisma.leaveType.findUnique({
+    where: {
+      id: Number(leaveTypeId),
+    },
+    select: {
+      maxDays: true,
+      name: true
+    },
+  });
+
+  if(!leaveType) return {errorMsg: "Leave type not found."}
+
+  if(leaveType.name === "Annual Leave"){
+    const calculatedAnnualLeaveDays = await calculateSluAnnualLeaveBalance(Number(empId))
+    if(calculatedAnnualLeaveDays < 0) return {leaveBalance: {balance: 0}}
+    return {leaveBalance: {balance: calculatedAnnualLeaveDays}}
+  }
+
+  if(leaveType?.name === "Maternity Leave"){
+    const lastApprovedMatternityLeave = await prisma.leaveRequest.findFirst({
+      where: {
+        userId: Number(empId),
+        leaveTypeId: Number(leaveTypeId),
+        status: "APPROVED"
+      },
+      orderBy: {
+        id: "desc"
+      },
+      select: {
+        updatedAt: true
+      }
+    })
+    if(lastApprovedMatternityLeave && (new Date().getFullYear() - new Date(lastApprovedMatternityLeave.updatedAt as Date).getFullYear()) < 1){
+      return {leaveBalance: {balance: 0}}
+    }else{
+      return{leaveBalance: {balance: leaveType.maxDays}}
+    }
+  }
+
+  if(leaveType?.name === "Paternity Leave"){
+    const lastApprovedPaternityLeave = await prisma.leaveRequest.findFirst({
+      where: {
+        userId: Number(empId),
+        leaveTypeId: Number(leaveTypeId),
+        status: "APPROVED"
+      },
+      orderBy: {
+        id: "desc"
+      },
+      select: {
+        updatedAt: true
+      }
+    })
+    if(lastApprovedPaternityLeave && (new Date().getFullYear() - new Date(lastApprovedPaternityLeave.updatedAt as Date).getFullYear()) < 1){
+      return {leaveBalance: {balance: 0}}
+    }else{
+      return{leaveBalance: {balance: leaveType.maxDays}}
+    }
+  }
+
+  //--------------------
   const leaveBalance = await prisma.leaveBalance.findFirst({
     where: {
       userId: empId,
@@ -1235,6 +1377,7 @@ export async function getLeaveBalance(empId: number, leaveTypeId: number) {
   });
   return { leaveBalance };
 }
+
 
 export async function createLeaveRequest(
   prevState: UserFormState,
@@ -1259,6 +1402,18 @@ export async function createLeaveRequest(
         errorMsg: "You can't request another leave while you'r on a leave!",
       };
     }
+    //Check for pending request
+    const hasLeaveRequest = await prisma.leaveRequest.findFirst({
+      where: {
+        userId: Number(user?.id),
+        status: "PENDING"
+      }
+    })
+    if(hasLeaveRequest){
+      return {
+        errorMsg: "You already have a pending leave request.",
+      };
+    }
 
     // Validate the data (add more validation as needed)
     if (!empId || !leaveTypeId || !startDate || !endDate || !reason) {
@@ -1266,8 +1421,6 @@ export async function createLeaveRequest(
         errorMsg: "Please fill in all fields.",
       };
     }
-
-    //-----------------------------------
 
     //startDate and endDate
     const start = new Date(startDate)
@@ -1292,9 +1445,155 @@ export async function createLeaveRequest(
         name: true
       },
     });
-    if(leaveType?.name === "Maternity Leave" && ((await prisma.user.findUnique({where:{id: Number(user.id)}, select:{gender:true}})) !== "Female")){
-      return {errorMsg: "You are a Man!"}
+
+    if(!leaveType) return {errorMsg: "Leave type not found."}
+    //====================Annual Leave================================
+    if(leaveType.name === "Annual Leave"){
+      const calculatedAnnualLeaveDays = leaveBalance?.balance
+
+      if(!calculatedAnnualLeaveDays) return {errorMsg: "You aren't elligible for Annual Leave"}
+      if(calculatedAnnualLeaveDays <= 0) return {errorMsg: "You aren't elligible for Annual Leave"}
+      if(days > calculatedAnnualLeaveDays) return {errorMsg: "Insufficient leave balance"}
+      const newAnnualLeaveBalance = calculatedAnnualLeaveDays - days
+
+      const existingLeaveBalance = await prisma.leaveBalance.findUnique({
+        where: {
+          userId_leaveTypeId:{
+            userId: Number(empId),
+            leaveTypeId: Number(leaveTypeId),
+          }
+        }
+      })
+      await prisma.leaveRequest.create({
+        data: {
+          userId: Number(empId),
+          leaveTypeId: Number(leaveTypeId),
+          startDate: new Date(startDate),
+          endDate: new Date(endDate),
+          days,
+          reason: reason,
+          status: "PENDING",
+        },
+      });
+      //update balance
+      if(!existingLeaveBalance){
+        await prisma.leaveBalance.create({
+          data: {
+            userId: Number(empId),
+            leaveTypeId: Number(leaveTypeId),
+            balance: newAnnualLeaveBalance,
+          },
+        });
+      }else{
+        await prisma.leaveBalance.update({
+          where: {
+            id: existingLeaveBalance.id,
+          },
+          data: {
+            balance: newAnnualLeaveBalance,
+          },
+        });
+      }
+
+      return {
+        successMsg: "Leave request submitted successfully!",
+      };
     }
+    //==================================================================
+    //==========================Maternity Leave=========================
+    if(leaveType?.name === "Maternity Leave"){
+      const femaleUser = await prisma.user.findUnique({where:{id: Number(user.id)}, select:{gender:true}})
+      if(femaleUser?.gender !== "Female") return {errorMsg: "You are a Man"}
+
+      const lastApprovedMatternityLeave = await prisma.leaveRequest.findFirst({
+        where: {
+          userId: Number(empId),
+          leaveTypeId: Number(leaveTypeId),
+          status: "APPROVED"
+        },
+        orderBy: {
+          id: "desc"
+        },
+        select: {
+          updatedAt: true
+        }
+      })
+
+      // if(leaveType.maxDays !== days){
+      //   return {errorMsg: `Maternity leave request days must be ${leaveType.maxDays} days.`}
+      // }
+
+      if(lastApprovedMatternityLeave && (new Date().getFullYear() - new Date(lastApprovedMatternityLeave.updatedAt as Date).getFullYear()) < 1){
+        return {errorMsg: "Wait atleast a year before requesting another maternity leave"}
+      }
+      const startingDate = new Date(start)
+      const endDate = new Date(startingDate)
+      endDate.setDate(startingDate.getDate() + leaveType.maxDays)
+
+      await prisma.leaveRequest.create({
+        data: {
+          userId: Number(empId),
+          leaveTypeId: Number(leaveTypeId),
+          startDate: startingDate,
+          endDate: endDate,
+          reason: reason,
+          days: leaveType.maxDays,
+          status: "PENDING",
+        },
+      });
+      return {
+        successMsg: "Leave request submitted successfully!",
+      };
+    }
+    //==================================================================
+    //==========================Paternity Leave=========================
+    if(leaveType?.name === "Paternity Leave"){
+      const maleUser = await prisma.user.findUnique({where:{id: Number(user.id)}, select:{gender:true}})
+      if(maleUser?.gender !== "Male") return {errorMsg: "You are not a Man"}
+
+      const lastApprovedPaternityLeave = await prisma.leaveRequest.findFirst({
+        where: {
+          userId: Number(empId),
+          leaveTypeId: Number(leaveTypeId),
+          status: "APPROVED"
+        },
+        orderBy: {
+          id: "desc"
+        },
+        select: {
+          updatedAt: true
+        }
+      })
+
+      // if(leaveType.maxDays !== days){
+      //   return {errorMsg: `Paternity leave request days must be ${leaveType.maxDays} days.`}
+      // }
+
+      if(lastApprovedPaternityLeave && (new Date().getFullYear() - new Date(lastApprovedPaternityLeave.updatedAt as Date).getFullYear()) < 1){
+        return {errorMsg: "Wait atleast a year before requesting another maternity leave"}
+      }
+      const startingDate = new Date(start)
+      const endDate = new Date(startingDate)
+      endDate.setDate(startingDate.getDate() + leaveType.maxDays)
+
+      await prisma.leaveRequest.create({
+        data: {
+          userId: Number(empId),
+          leaveTypeId: Number(leaveTypeId),
+          startDate: startingDate,
+          endDate: endDate,
+          reason: reason,
+          days: leaveType.maxDays,
+          status: "PENDING",
+        },
+      });
+      return {
+        successMsg: "Leave request submitted successfully!",
+      };
+    }
+    //==================================================================
+    
+
     if (!leaveBalance?.id) {
       if (leaveType.maxDays < days) {
         return {
@@ -1307,6 +1606,7 @@ export async function createLeaveRequest(
           leaveTypeId: Number(leaveTypeId),
           startDate: new Date(startDate),
           endDate: new Date(endDate),
+          days,
           reason: reason,
           status: "PENDING",
         },
@@ -1330,18 +1630,11 @@ export async function createLeaveRequest(
           leaveTypeId: Number(leaveTypeId),
           startDate: new Date(startDate),
           endDate: new Date(endDate),
+          days,
           reason: reason,
           status: "PENDING",
         },
       });
-      // AND: [
-      //   {
-      //     userId: Number(empId),
-      //   },
-      //   {
-      //     leaveTypeId: Number(leaveTypeId),
-      //   },
-      // ],
       await prisma.leaveBalance.update({
         where: {
           id: leaveBalance.id,
@@ -1352,7 +1645,7 @@ export async function createLeaveRequest(
       });
     }
 
-    revalidatePath("/dashboard");
+    revalidatePath("/leave/history");
     return {
       successMsg: "Leave request submitted successfully!",
     };
@@ -1363,6 +1656,7 @@ export async function createLeaveRequest(
     };
   }
 }
+
 export async function approveLeave(leaveId: number) {
   try{
     const user = (await session())?.user;
@@ -1470,9 +1764,27 @@ export async function rejectLeave(leaveId: number){
         leaveTypeId: true,
         startDate: true,
         endDate: true,
+        status: true,
+        leaveType: true,
       },
     });
     if(!leave) return {errorMsg: "Leave request not found."}
+    //-------------------------------------------------
+    if(leave.status !== "PENDING") return {errorMsg: "Can't reject approved leave request."}
+    if(leave.leaveType.name === "Maternity Leave" || leave.leaveType.name === "Paternity Leave"){
+       await prisma.leaveRequest.update({
+        where: {
+          id: leaveId,
+        },
+        data: {
+          status: "REJECTED",
+        },
+      });
+      revalidatePath("/admin/leave");
+      revalidatePath("/supervisor/leave");
+      return { successMsg: "Leave request rejected successfully!" };
+    }
+    //-------------------------------------------------
     const leaveDays = await calculateLeaveDays(leave?.startDate as Date, leave?.endDate as Date);
     await prisma.leaveBalance.update({
       where: {
@@ -1523,11 +1835,22 @@ export async function cancelLeave(leaveId: number){
         leaveTypeId: true,
         startDate: true,
         endDate: true,
-        status: true
+        status: true,
+        leaveType: true,
       },
     });
     if(!leave) return {errorMsg: "Leave request not found."}
     if(leave.status !== "PENDING") return {errorMsg: "Can't cancel approved leave request."}
+    if(leave.leaveType.name === "Maternity Leave" || leave.leaveType.name === "Paternity Leave"){
+       await prisma.leaveRequest.delete({
+        where: {
+          id: leaveId,
+        },
+      });
+      revalidatePath("/leave/history");
+      return { successMsg: "Leave request canceled successfully!" };
+    }
+    
     const leaveDays = await calculateLeaveDays(leave?.startDate as Date, leave?.endDate as Date);
     await prisma.leaveBalance.update({
       where: {
@@ -1615,19 +1938,19 @@ async function getEmployeeAttendance(empId: number, date: Date) {
 }
 
 //employee page
-export async function registerAttendanceByEmployee(id: number, status=false){
+export async function registerAttendanceByEmployee(id: number, status = false) {
   if (!(await isWorkingDay())) {
     console.log("NOT A WORKING DAY");
     return { errorMsg: "Not a working day", isWorkingDay: false };
   }
-  if((await isOnLeave(id))){
-    return {errorMsg: "Employee is on leave", onLeave: true}
+  if (await isOnLeave(id)) {
+    return { errorMsg: "Employee is on leave", onLeave: true };
   }
 
   const settings = await prisma.settings.findMany({
     where: {
       key: {
-        in: ["check_out_enabled", "attendance_time"],
+        in: ["check_out_enabled", "attendance_time", "late_check_in_allowed"],
       },
     },
     select: {
@@ -1656,12 +1979,17 @@ export async function registerAttendanceByEmployee(id: number, status=false){
   const checkOutThreshold = Number(attendanceTimeSetting.check_out.threshold); //In Mins
   const checkOutEnabled =
     settings.find((item) => item.key === "check_out_enabled")?.value === "true";
-
   const now = new Date().getHours() * 60 + new Date().getMinutes();
-  const timeOfTheDay = (morningCheckInTime + checkInThreshold) < now && (now < (morningCheckOutTime - checkOutThreshold)) ? "morning" : (afternoonCheckInTime + checkInThreshold) < now && (now < (afternoonCheckOutTime+30 - checkOutThreshold)) ? "afternoon" : ""
-  if(timeOfTheDay === ""){
-    console.log("Time of the day", new Date().getHours())
 
+  // console.log('Now: ',now,(morningCheckInTime + checkInThreshold) < now )
+  const timeOfTheDay =
+    morningCheckInTime < now && now < morningCheckOutTime
+      ? "morning"
+      : afternoonCheckInTime < now && now < afternoonCheckOutTime
+      ? "afternoon"
+      : "";
+  if (timeOfTheDay === "") {
+    console.log("Not within attendance time");
     return {
       errorMsg: "Not within attendance time",
       isWorkingDay: true,
@@ -1673,6 +2001,7 @@ export async function registerAttendanceByEmployee(id: number, status=false){
       },
     };
   }
+  const { startOfDay: todayStartOfDay, endOfDay: todayEndOfDay } = await formatDate(new Date());
   const attendance = await prisma.attendance.findFirst({
     where: {
       AND: [
@@ -1681,8 +2010,8 @@ export async function registerAttendanceByEmployee(id: number, status=false){
         },
         {
           date: {
-            lte: (await formatDate(new Date())).endOfDay,
-            gte: (await formatDate(new Date())).startOfDay,
+            lte: todayEndOfDay,
+            gte: todayStartOfDay,
           },
         },
       ],
@@ -1698,131 +2027,236 @@ export async function registerAttendanceByEmployee(id: number, status=false){
       date: true,
     },
   });
-
-  if(status){
-    return{
+  // console.log("ATTENDANCE: ",timeOfTheDay)
+  if (status) {
+    return {
       timeOfTheDay,
       attendance,
       checkOutEnabled,
-      lateClockInEnabled: settings.find((item) => item.key === "late_check_in_allowed")!?.value === "true",
-      isLateForClockIn: timeOfTheDay && timeOfTheDay === "morning" && (morningCheckInTime + checkInThreshold) < now || timeOfTheDay && timeOfTheDay === "afternoon" && (afternoonCheckInTime + checkInThreshold) < now,
-      isEarlyForClockOut: timeOfTheDay && timeOfTheDay === "afternoon" && (afternoonCheckOutTime - checkOutThreshold) > now || timeOfTheDay && timeOfTheDay === "morning" && (morningCheckOutTime - checkOutThreshold) > now,
-    }
+      lateClockInEnabled:
+        settings.find((item) => item.key === "late_check_in_allowed")!
+          ?.value === "true",
+      isLateForClockIn:
+        (timeOfTheDay &&
+          timeOfTheDay === "morning" &&
+          morningCheckInTime + checkInThreshold < now) ||
+        (timeOfTheDay &&
+          timeOfTheDay === "afternoon" &&
+          afternoonCheckInTime + checkInThreshold < now),
+      isEarlyForClockOut:
+        (timeOfTheDay &&
+          timeOfTheDay === "afternoon" &&
+          afternoonCheckOutTime - checkOutThreshold > now) ||
+        (timeOfTheDay &&
+          timeOfTheDay === "morning" &&
+          morningCheckOutTime - checkOutThreshold > now),
+    };
   }
 
   const determineClockAction = () => {
-    // if(timeOfTheDay === "morning"){
-    //   if(attendance?.morningCheckOutTime){
-    //     return {errorMsg: "Already checked out for morning"}
-    //   }
-    //   return "clock_out"
-    // }
-    // if(timeOfTheDay === "afternoon"){
-    //   if(attendance?.afternoonCheckOutTime){
-    //     return {errorMsg: "Already checked out for afternoon"}
-    //   }
-    //   return "clock_out"
-    // }
-    // return "clock_in"
-    if(timeOfTheDay === "morning" && attendance?.morningCheckInTime && checkOutEnabled || 
-      timeOfTheDay === "afternoon" && attendance?.afternoonCheckInTime && checkOutEnabled){
-        return 'clock_out'
+    if (
+      (timeOfTheDay === "morning" &&
+        attendance?.morningCheckInTime &&
+        checkOutEnabled) ||
+      (timeOfTheDay === "afternoon" &&
+        attendance?.afternoonCheckInTime &&
+        checkOutEnabled)
+    ) {
+      return "clock_out";
     }
-    return 'clock_in'
-  }
+    return "clock_in";
+  };
+  // const timeOfTheDayTest = "morning"
   const type = determineClockAction();
-  if(type === "clock_in"){
-    if(timeOfTheDay === "morning"){
-      if(attendance?.morningCheckInTime){
-        return {errorMsg: "Already checked in for morning"}
-      }
-      await prisma.attendance.create({
-        data: {
-          userId: Number(id),
-          date: new Date(),
-          morningCheckInTime: new Date(),
-          isLateMorningCheckIn: morningCheckInTime + checkInThreshold < now,
-          status: "PRESENT",
-          checkOutEnabled,
-        },
-      });
-    }
-    if(timeOfTheDay === "afternoon"){
-      // if(!attendance?.morningCheckInTime || !attendance?.morningCheckOutTime){
-      //   return {errorMsg: "Check in for morning first"}
-      // }
-      if(attendance?.afternoonCheckInTime){
-        return {errorMsg: "Already checked in for afternoon"}
-      }
-      if(attendance){
-      await prisma.attendance.update({
-        where: {
-          id: attendance.id,
-        },
-        data: {
-          afternoonCheckInTime: new Date(),
-          isLateAfternoonCheckIn: afternoonCheckInTime + checkInThreshold < now,
-        },
-      });
-    }else{
-      await prisma.attendance.create({
-        data: {
-          userId: Number(id),
-          date: new Date(),
-          afternoonCheckInTime: new Date(),
-          isLateAfternoonCheckIn: afternoonCheckInTime + checkInThreshold < now,
-          checkOutEnabled,
-          status: "PRESENT",
+  try{
+    if (type === "clock_in") {
+      if (timeOfTheDay === "morning") {
+        if (attendance?.morningCheckInTime) {
+          return { errorMsg: "Already checked in for morning" };
         }
-      })
+        //check for lateness
+        if (
+          !(
+            settings.find((item) => item.key === "late_check_in_allowed")!
+              ?.value === "true"
+          ) &&
+          morningCheckInTime + checkInThreshold < now
+        ) {
+          return { errorMsg: "Not within attendance time" };
+        }
+        //------------------
+        if (attendance) {
+          await prisma.attendance.update({
+            where: {
+              id: attendance.id,
+            },
+            data: {
+              morningCheckInTime: new Date(),
+              isLateMorningCheckIn: morningCheckInTime + checkInThreshold < now,
+            },
+          });
+        } else {
+          console.log("CREATING ATTENDANCE...");
+          await prisma.attendance.create({
+            data: {
+              userId: Number(id),
+              // date: new Date(),
+              date: todayStartOfDay,
+              morningCheckInTime: new Date(),
+              isLateMorningCheckIn: morningCheckInTime + checkInThreshold < now,
+              status: "PRESENT",
+              checkOutEnabled,
+              manuallyCheckedIn: false,
+            },
+          });
+        }
+      }
+      else if (timeOfTheDay === "afternoon") { // Changed to else if for clarity and correctness
+        // if(!attendance?.morningCheckInTime || !attendance?.morningCheckOutTime){
+        //   return {errorMsg: "Check in for morning first"}
+        // }
+        if (attendance?.afternoonCheckInTime) {
+          return { errorMsg: "Already checked in for afternoon" };
+        }
+        //check for lateness
+        if (
+          !(
+            settings.find((item) => item.key === "late_check_in_allowed")!
+              ?.value === "true"
+          ) &&
+          afternoonCheckInTime + checkInThreshold < now
+        ) {
+          return { errorMsg: "Not within attendance time" };
+        }
+        //------------------
+        if (attendance) {
+          await prisma.attendance.update({
+            where: {
+              id: attendance.id,
+            },
+            data: {
+              afternoonCheckInTime: new Date(),
+              isLateAfternoonCheckIn:
+                afternoonCheckInTime + checkInThreshold < now,
+            },
+          });
+        } else {
+          await prisma.attendance.create({
+            data: {
+              userId: Number(id),
+              // date: new Date(),
+              date: todayStartOfDay,
+              afternoonCheckInTime: new Date(),
+              isLateAfternoonCheckIn:
+                afternoonCheckInTime + checkInThreshold < now,
+              checkOutEnabled,
+              status: "PRESENT",
+              manuallyCheckedIn: false,
+            },
+          });
+        }
+      }
+      // If clock_in logic completed successfully without returning an error,
+      // return success now to prevent falling through to clock_out logic.
+      revalidatePath("/");
+      return { successMsg: "Attendance registered successfully!" };
+    }
+
+    // The code below will only be reached if type === "clock_out"
+    if (type === "clock_out") {
+      if (checkOutEnabled) {
+      if (timeOfTheDay === "morning") {
+        if (!attendance?.morningCheckInTime) {
+          return { errorMsg: "Check in for morning first" };
+        }
+        if (!attendance?.morningCheckOutTime) {
+          //wait atleast 30mins before checkout
+          const morningCheckInTime = new Date(attendance.morningCheckInTime); // Assuming morningCheckInTime is guaranteed by prior checks
+          const currentTime = new Date();
+
+          const checkInMinutes =
+            morningCheckInTime.getHours() * 60 + morningCheckInTime.getMinutes();
+          const currentMinutes =
+            currentTime.getHours() * 60 + currentTime.getMinutes();
+
+          if (currentMinutes - checkInMinutes < 30) {
+            return {
+              errorMsg:
+                "Wait at least 30 minutes after clock-in before clocking out.",
+            };
+          }
+          //--------------------------------------
+          await prisma.attendance.update({
+            where: {
+              id: attendance.id,
+            },
+            data: {
+              morningCheckOutTime: new Date(),
+              isEarlyMorningCheckOut:
+                morningCheckOutTime - checkOutThreshold > now,
+              checkOutEnabled: true,
+            },
+          });
+        } else {
+          return { errorMsg: "Already checked out for morning" };
+        }
+      } else if (timeOfTheDay === "afternoon") { // Changed to else if for clarity
+        if (!attendance?.afternoonCheckInTime) {
+          return { errorMsg: "Check in for afternoon first" };
+        }
+
+        if (!attendance?.afternoonCheckOutTime) {
+          //wait atleast 30mins before checkout
+          const afternoonCheckInTime = new Date(attendance.afternoonCheckInTime); // Assuming afternoonCheckInTime is guaranteed by prior checks
+          const currentTime = new Date();
+          console.log("Afternoon Checkin Time: ", afternoonCheckInTime);
+          const checkInMinutes =
+            afternoonCheckInTime.getHours() * 60 +
+            afternoonCheckInTime.getMinutes();
+          const currentMinutes =
+            currentTime.getHours() * 60 + currentTime.getMinutes();
+
+          if (currentMinutes - checkInMinutes < 30) {
+            return {
+              errorMsg:
+                "Wait at least 30 minutes after clock-in before clocking out.",
+            };
+          }
+          //--------------------------------------
+
+          await prisma.attendance.update({
+            where: {
+              id: attendance.id,
+            },
+            data: {
+              afternoonCheckOutTime: new Date(),
+              isEarlyAfternoonCheckOut:
+                afternoonCheckOutTime - checkOutThreshold > now,
+            },
+          });
+        } else {
+          return { errorMsg: "Already checked out for afternoon" };
+        }
+      }
+      // If clock_out was successful and didn't return an error,
+      // it will fall through to the common success return at the end of the try block.
+    } else { // This 'else' now correctly means: type is "clock_out" AND checkOutEnabled is false
+        return { errorMsg: "Clock-out cannot be recorded because the check-out feature is currently disabled by an administrator." };
     }
     }
-  }
-  if(type === "clock_out" && checkOutEnabled){
-    // if(!attendance?.morningCheckInTime){
-    //   return {errorMsg: "Check in for morning first"}
-    // }
-    if(timeOfTheDay === "morning"){
-      if(!attendance?.morningCheckInTime){
-        return {errorMsg: "Check in for morning first"}
-      }
-      if(!attendance?.morningCheckOutTime){
-        await prisma.attendance.update({
-          where: {
-            id: attendance.id,
-          },
-          data: {
-            morningCheckOutTime: new Date(),
-            isEarlyMorningCheckOut: morningCheckOutTime - checkOutThreshold > now,
-            checkOutEnabled: true,
-          },
-        });
-      }else{
-        return {errorMsg: "Already checked out for morning"}
-      }
-    }
-    if(timeOfTheDay === "afternoon"){
-      if(!attendance?.afternoonCheckInTime){
-        return {errorMsg: "Check in for afternoon first"}
-      }
-      if(!attendance?.afternoonCheckOutTime){
-        await prisma.attendance.update({
-          where: {
-            id: attendance.id,
-          },
-          data: {
-            afternoonCheckOutTime: new Date(),
-            isEarlyAfternoonCheckOut: afternoonCheckOutTime - checkOutThreshold > now,
-          },
-        });
-      }else{
-        return {errorMsg: "Already checked out for afternoon"}
-      }
-    }
+    // If a clock_out operation was successful and didn't return early, it reaches here.
+  }catch (error) {
+    console.error("Error registering attendance:", error);
+    return {
+      errorMsg: "Failed to register attendance, possible attendance duplication",
+    };
   }
   revalidatePath("/");
   return { successMsg: "Attendance registered successfully!" };
+
+
 }
+
 export async function getEmployeeAttendanceHistory(id: number){
   
   const attendance = await prisma.attendance.findMany({
@@ -1838,6 +2272,8 @@ export async function getEmployeeAttendanceHistory(id: number){
       morningCheckOutTime: true,
       afternoonCheckInTime: true,
       afternoonCheckOutTime: true,
+      checkOutEnabled:true,
+      manuallyCheckedIn: true,
       date: true,
       status: true,
     },
@@ -1894,9 +2330,22 @@ export async function registerAttendance(
 
   // console.log(morningCheckInTime, morningCheckOutTime, afternoonCheckInTime, afternoonCheckOutTime, checkInThreshold, checkOutThreshold)
   const empId = rawData.employeeId;
+  const attendanceId = rawData.attendanceId;
   const date = rawData.date && new Date(rawData.date as string);
-  const selectedDate =
-    rawData.selectedDate && new Date(rawData.selectedDate as string);
+  // const selectedDate = rawData.selectedDate && new Date(rawData.selectedDate as string);
+  const parts = new Date(rawData.selectedDate as string); // Parses as local
+const selectedDateAsUTC = new Date(Date.UTC(parts.getFullYear(), parts.getMonth(), parts.getDate()));
+// console.log("UTC: ",selectedDateAsUTC?.toISOString()); // This would output 2025-05-19T00:00:00.000Z
+const selectedDate = selectedDateAsUTC  
+//-----------------------------------------------------
+    //   const dateString = "2025-05-19"; // Using YYYY-MM-DD format is more reliable for UTC parsing
+    // const selectedDateAsUTC = new Date(dateString + "T00:00:00Z");
+    // or for your specific format, you might need to construct it carefully:
+    // const parts = new Date(rawData.selectedDate as string); // Parses as local
+    // const selectedDateAsUTC = new Date(Date.UTC(parts.getFullYear(), parts.getMonth(), parts.getDate()));
+    // console.log(selectedDateAsUTC.toISOString()); // This would output 2025-05-19T00:00:00.000Z
+  //-----------------------------------------------------
+
 
   //Time as Hr:Min  (add saved as DateTime in db)
   let morningCheckIn = rawData.morningCheckInTime as string;
@@ -1904,7 +2353,16 @@ export async function registerAttendance(
   let afternoonCheckIn = rawData.afternoonCheckInTime as string;
   let afternoonCheckOut = rawData.afternoonCheckOutTime as string;
   const status = rawData.status as string;
-
+  console.log("Emp Id: ",empId,
+    "M-I, M-O, A-I, A-O",
+    morningCheckIn,
+    ", ",
+    morningCheckOut,
+    ", ",
+    afternoonCheckIn,
+    ", ",
+    afternoonCheckOut
+  );
   const supId = rawData.supId as string;
   //Supervisor updating checkout
   if (supId) {
@@ -1926,8 +2384,8 @@ export async function registerAttendance(
     });
     if (
       supervisor?.departmentId !== user?.departmentId &&
-        settings?.find((item) => item.key === "check_out_enabled")?.value! !==
-          "true"
+      settings?.find((item) => item.key === "check_out_enabled")?.value! !==
+        "true"
     ) {
       return {
         errorMsg: "Validation failed",
@@ -1936,203 +2394,224 @@ export async function registerAttendance(
     }
   }
 
-    if (!empId && (!date || !selectedDate)) {
+  if (!empId && (!date || !selectedDate)) {
+    return {
+      errorMsg: "Validation failed",
+      errors: { morningCheckIn: [""] },
+    };
+  }
+
+  if (status && status == "Absent") {
+    morningCheckIn =
+      morningCheckOut =
+      afternoonCheckIn =
+      afternoonCheckOut =
+        "";
+  }
+
+  //Attendance Updation or Creation Data
+  const data: any = (outEnabled: Boolean) => {
+    const currentDate = date || selectedDate;
+
+    if (!outEnabled) {
       return {
-        errorMsg: "Validation failed",
-        errors: { morningCheckIn: [""] },
+        morningCheckInTime:
+          (morningCheckIn &&
+            new Date(
+              new Date(currentDate).setHours(
+                Number(morningCheckIn.split(":")[0]),
+                Number(morningCheckIn.split(":")[1])
+              )
+            )) ||
+          undefined,
+        afternoonCheckInTime:
+          (afternoonCheckIn &&
+            new Date(
+              new Date(currentDate).setHours(
+                Number(afternoonCheckIn.split(":")[0]),
+                Number(afternoonCheckIn.split(":")[1])
+              )
+            )) ||
+          undefined,
+
+        isLateMorningCheckIn:
+          (morningCheckIn || undefined) &&
+          morningCheckInTime + checkInThreshold <
+            timeStringToMinutes(morningCheckIn),
+        isLateAfternoonCheckIn:
+          (afternoonCheckIn || undefined) &&
+          afternoonCheckInTime + checkInThreshold <
+            timeStringToMinutes(afternoonCheckIn),
+
+        status: morningCheckIn || afternoonCheckIn ? "PRESENT" : "ABSENT",
+        checkOutEnabled: false,
+      };
+    } else if (supId && outEnabled) {
+      //supervisor edit checkout
+      return {
+        morningCheckInTime: undefined,
+        afternoonCheckInTime: undefined,
+        morningCheckOutTime:
+          (morningCheckOut &&
+            new Date(
+              new Date(currentDate).setHours(
+                Number(morningCheckOut.split(":")[0]),
+                Number(morningCheckOut.split(":")[1])
+              )
+            )) ||
+          undefined,
+        afternoonCheckOutTime:
+          (afternoonCheckOut &&
+            new Date(
+              new Date(currentDate).setHours(
+                Number(afternoonCheckOut.split(":")[0]),
+                Number(afternoonCheckOut.split(":")[1])
+              )
+            )) ||
+          undefined,
+        isLateMorningCheckIn: undefined,
+        isLateAfternoonCheckIn: undefined,
+
+        isEarlyMorningCheckOut:
+          (morningCheckOut || undefined) &&
+          morningCheckOutTime - checkOutThreshold >
+            timeStringToMinutes(morningCheckOut),
+        isEarlyAfternoonCheckOut:
+          (afternoonCheckOut || undefined) &&
+          afternoonCheckOutTime - checkOutThreshold >
+            timeStringToMinutes(afternoonCheckOut),
+
+        status: morningCheckIn || afternoonCheckIn ? "PRESENT" : "ABSENT",
+        checkOutEnabled: true,
+      };
+    } else if (outEnabled) {
+      console.log("Morning check in: ", morningCheckIn);
+      console.log("Afternoon check in: ", afternoonCheckIn);
+      //          prisma.$executeRaw`
+      //   INSERT INTO public.'Attendance' (morningCheckInTime, date, userId)
+      //   VALUES (NOW() AT TIME ZONE 'America/New_York', NOW() AT TIME ZONE 'America/New_York', 1)
+      // `;
+      console.log(
+        "MORRNING: ",
+        morningCheckIn &&
+          morningCheckInTime + checkInThreshold <
+            timeStringToMinutes(morningCheckIn)
+      );
+      console.log(
+        "IS_LATE: ",
+        (morningCheckIn || undefined) &&
+          morningCheckInTime + checkInThreshold <
+            timeStringToMinutes(morningCheckIn)
+      );
+      return {
+        morningCheckInTime:
+          (morningCheckIn &&
+            new Date(
+              new Date(currentDate).setHours(
+                Number(morningCheckIn.split(":")[0]),
+                Number(morningCheckIn.split(":")[1])
+              )
+            )) ||
+          undefined,
+        afternoonCheckInTime:
+          (afternoonCheckIn &&
+            new Date(
+              new Date(currentDate).setHours(
+                Number(afternoonCheckIn.split(":")[0]),
+                Number(afternoonCheckIn.split(":")[1])
+              )
+            )) ||
+          undefined,
+        morningCheckOutTime:
+          (morningCheckOut &&
+            new Date(
+              new Date(currentDate).setHours(
+                Number(morningCheckOut.split(":")[0]),
+                Number(morningCheckOut.split(":")[1])
+              )
+            )) ||
+          undefined,
+        afternoonCheckOutTime:
+          (afternoonCheckOut &&
+            new Date(
+              new Date(currentDate).setHours(
+                Number(afternoonCheckOut.split(":")[0]),
+                Number(afternoonCheckOut.split(":")[1])
+              )
+            )) ||
+          undefined,
+
+        isLateMorningCheckIn:
+          (morningCheckIn || undefined) &&
+          morningCheckInTime + checkInThreshold <
+            timeStringToMinutes(morningCheckIn),
+        isLateAfternoonCheckIn:
+          (afternoonCheckIn || undefined) &&
+          afternoonCheckInTime + checkInThreshold <
+            timeStringToMinutes(afternoonCheckIn),
+        isEarlyMorningCheckOut:
+          (morningCheckOut || undefined) &&
+          morningCheckOutTime - checkOutThreshold >
+            timeStringToMinutes(morningCheckOut),
+        isEarlyAfternoonCheckOut:
+          (afternoonCheckOut || undefined) &&
+          afternoonCheckOutTime - checkOutThreshold >
+            timeStringToMinutes(afternoonCheckOut),
+
+        status: morningCheckIn || afternoonCheckIn ? "PRESENT" : "ABSENT",
+        checkOutEnabled: true,
       };
     }
+  };
+  console.log("ATTENANCE ID: ", attendanceId, " selected date: ", selectedDate)
+  if (selectedDate) { 
+    //if attendance exists update
+    if (attendanceId) {
+      const existingAttendance = await prisma.attendance.findUnique({
+        where:{
+          id: Number(attendanceId)
+        }
+      })
+      console.log("Existing Atten for empId: ",empId, " is ",existingAttendance)
+      console.log("New Attend DATA: ", data(existingAttendance?.checkOutEnabled));
 
-    if (status && status == "Absent") {
-      morningCheckIn =
-        morningCheckOut =
-        afternoonCheckIn =
-        afternoonCheckOut =
-          "";
-    }
+      if(!existingAttendance){return {errorMsg: "Invalid Input"}}
 
-    //Attendance Updation or Creation Data
-    const data: any = (outEnabled: Boolean) => {
-      const currentDate = date || selectedDate;
-
-      if (!outEnabled) {
-        return {
-          morningCheckInTime:
-            (morningCheckIn &&
-              new Date(
-                new Date(currentDate).setHours(
-                  Number(morningCheckIn.split(":")[0]),
-                  Number(morningCheckIn.split(":")[1])
-                )
-              )) ||
-            undefined,
-          afternoonCheckInTime:
-            (afternoonCheckIn &&
-              new Date(
-                new Date(currentDate).setHours(
-                  Number(afternoonCheckIn.split(":")[0]),
-                  Number(afternoonCheckIn.split(":")[1])
-                )
-              )) ||
-            undefined,
-
-          isLateMorningCheckIn:
-            (morningCheckIn || undefined) &&
-            morningCheckInTime + checkInThreshold <
-              timeStringToMinutes(morningCheckIn),
-          isLateAfternoonCheckIn:
-            (afternoonCheckIn || undefined) &&
-            afternoonCheckInTime + checkInThreshold <
-              timeStringToMinutes(afternoonCheckIn),
-
-          status: morningCheckIn || afternoonCheckIn ? "PRESENT" : "ABSENT",
-          checkOutEnabled: false,
-        };
-      } else if (supId && outEnabled) {
-        //supervisor edit checkout
-        return {
-          morningCheckInTime: undefined,
-          afternoonCheckInTime: undefined,
-          morningCheckOutTime:
-            (morningCheckOut &&
-              new Date(
-                new Date(currentDate).setHours(
-                  Number(morningCheckOut.split(":")[0]),
-                  Number(morningCheckOut.split(":")[1])
-                )
-              )) ||
-            undefined,
-          afternoonCheckOutTime:
-            (afternoonCheckOut &&
-              new Date(
-                new Date(currentDate).setHours(
-                  Number(afternoonCheckOut.split(":")[0]),
-                  Number(afternoonCheckOut.split(":")[1])
-                )
-              )) ||
-            undefined,
-          isLateMorningCheckIn: undefined,
-          isLateAfternoonCheckIn: undefined,
-
-          isEarlyMorningCheckOut:
-            (morningCheckOut || undefined) &&
-            morningCheckOutTime - checkOutThreshold >
-              timeStringToMinutes(morningCheckOut),
-          isEarlyAfternoonCheckOut:
-            (afternoonCheckOut || undefined) &&
-            afternoonCheckOutTime - checkOutThreshold >
-              timeStringToMinutes(afternoonCheckOut),
-
-          status: morningCheckIn || afternoonCheckIn ? "PRESENT" : "ABSENT",
-          checkOutEnabled: true,
-        };
-      } else if (outEnabled) {
-        console.log(
-          "MORRNING: ",
-          morningCheckIn &&
-            morningCheckInTime + checkInThreshold <
-              timeStringToMinutes(morningCheckIn)
-        );
-        console.log(
-          "IS_LATE: ",
-          (morningCheckIn || undefined) &&
-            morningCheckInTime + checkInThreshold <
-              timeStringToMinutes(morningCheckIn)
-        );
-        return {
-          morningCheckInTime:
-            (morningCheckIn &&
-              new Date(
-                new Date(currentDate).setHours(
-                  Number(morningCheckIn.split(":")[0]),
-                  Number(morningCheckIn.split(":")[1])
-                )
-              )) ||
-            undefined,
-          afternoonCheckInTime:
-            (afternoonCheckIn &&
-              new Date(
-                new Date(currentDate).setHours(
-                  Number(afternoonCheckIn.split(":")[0]),
-                  Number(afternoonCheckIn.split(":")[1])
-                )
-              )) ||
-            undefined,
-          morningCheckOutTime:
-            (morningCheckOut &&
-              new Date(
-                new Date(currentDate).setHours(
-                  Number(morningCheckOut.split(":")[0]),
-                  Number(morningCheckOut.split(":")[1])
-                )
-              )) ||
-            undefined,
-          afternoonCheckOutTime:
-            (afternoonCheckOut &&
-              new Date(
-                new Date(currentDate).setHours(
-                  Number(afternoonCheckOut.split(":")[0]),
-                  Number(afternoonCheckOut.split(":")[1])
-                )
-              )) ||
-            undefined,
-
-          isLateMorningCheckIn:
-            (morningCheckIn || undefined) &&
-            morningCheckInTime + checkInThreshold <
-              timeStringToMinutes(morningCheckIn),
-          isLateAfternoonCheckIn:
-            (afternoonCheckIn || undefined) &&
-            afternoonCheckInTime + checkInThreshold <
-              timeStringToMinutes(afternoonCheckIn),
-          isEarlyMorningCheckOut:
-            (morningCheckOut || undefined) &&
-            morningCheckOutTime - checkOutThreshold >
-              timeStringToMinutes(morningCheckOut),
-          isEarlyAfternoonCheckOut:
-            (afternoonCheckOut || undefined) &&
-            afternoonCheckOutTime - checkOutThreshold >
-              timeStringToMinutes(afternoonCheckOut),
-
-          status: morningCheckIn || afternoonCheckIn ? "PRESENT" : "ABSENT",
-          checkOutEnabled: true,
-        };
-      }
-    };
-
-    if (date) {
-      const employeeAttendance = await getEmployeeAttendance(
-        Number(empId),
-        date
-      );
-      console.log("DATA: ", data(employeeAttendance?.checkOutEnabled));
-      //if attendance exists update
-      if (employeeAttendance?.id) {
-        const res = await prisma.attendance.update({
-          where: {
-            id: employeeAttendance.id,
-          },
-          data: data(employeeAttendance.checkOutEnabled),
-        });
-        console.log("UPDATE RESULT: ", res);
-      }
-    } else {//if new create attendance
-      console.log("SELECTED DATE: ", selectedDate);
-
-      await prisma.attendance.create({
-        data: {
-          userId: Number(empId),
-          date: selectedDate,
-          manuallyCheckedIn: true,
-          ...data(checkOutEnabled),
+      const res = await prisma.attendance.update({
+        where: {
+          id: Number(attendanceId),
         },
+        data: data(existingAttendance.checkOutEnabled),
       });
+      console.log("UPDATE RESULT: ", res);
+    }else{
+      console.log("SELECTED DATE: ", selectedDate)
+      await prisma.attendance.create({
+      data: {
+        userId: Number(empId),
+        date: selectedDate,
+        manuallyCheckedIn: true,
+        ...data(checkOutEnabled),
+      },
+    });
     }
+  } else {
+    console.error("No Date Selected; in register function")
+    return{errorMsg: "No Date Selected"}
+    // await prisma.attendance.create({
+    //   data: {
+    //     userId: Number(empId),
+    //     date: selectedDate,
+    //     manuallyCheckedIn: true,
+    //     ...data(checkOutEnabled),
+    //   },
+    // });
+  }
 
-    revalidatePath("/admin/attendance");
-    revalidatePath(`/admin/attendance/${empId}`);
+  revalidatePath("/admin/attendance");
+  revalidatePath(`/admin/attendance/${empId}`);
 
-    return { successMsg: "Attendance registered successfully!" };
+  return { successMsg: "Attendance registered successfully!" };
 }
 
 
@@ -2445,8 +2924,24 @@ function isSameDate(date1: Date, date2: Date): boolean {
 async function isWorkingDay(date?:Date) {
    //Weekend
    const testDate = date ? date : new Date()
-   if(testDate.getDay() === 0 || testDate.getDay() === 6){
-    return false
+  if(testDate.getDay() === 0 || testDate.getDay() === 6){
+    //---------------------------------------------------
+    const settings = await prisma.settings.findUnique({
+      where: {
+        key: "saturday"
+      },
+      select: {
+        key: true,
+        value: true,
+        type: true,
+      },
+    });
+    const isSaturdayWorkDay = settings?.value === "true"
+    if(testDate.getDay() === 6 && isSaturdayWorkDay){
+      return true
+    }
+    //----------------------------------------------------
+    return false 
   }
   //Check if there are any events //
   //None recurring event
@@ -2579,3 +3074,62 @@ function isRecurringMatch(currentDate: Date, originalDate: Date, type: string): 
 }
 
 //=====================================REPORT=====================================
+export async function calculateSluAnnualLeaveBalance(empId:number){
+  const annualLeaveType = await prisma.leaveType.findUnique({
+    where: {
+      id:4, //Should'nt be hardcoded
+      name: "Annual Leave"
+    }
+  })
+  if(!annualLeaveType){throw new Error("Annual leave type not found")}
+  const annualLeaveBalance = await prisma.leaveBalance.findUnique({
+    where: {
+      userId_leaveTypeId:{
+        userId: Number(empId),
+        leaveTypeId: annualLeaveType.id,
+      }
+    }
+  })
+  const hireDate:Date | null | undefined = (await prisma.user.findUnique({
+    where: {
+      id: Number(empId)
+    },
+    select: {
+      hireDate: true
+    }
+  }))?.hireDate
+  if(!hireDate){ throw new Error("User hire date not found") }
+  const lastApprovedAnnualLeave = await prisma.leaveRequest.findFirst({
+    where: {
+      userId: Number(empId),
+      leaveTypeId: annualLeaveType.id,
+      status: "APPROVED"
+    },
+    orderBy: {
+      id: "desc"
+    },
+    select: {
+      updatedAt: true
+    }
+  })
+
+  const currentYear = new Date().getFullYear();
+  const firstYearServiceEntitlement = 19 //days 20 (subtructed one so that it will be 20 on the first year)
+  const yearlyAddedNumberOfDays = 1
+  const maxYearlyLeaveEntitlementDays = 30 //days
+  const numberOfServiceYears = currentYear - hireDate.getFullYear()
+  console.log(numberOfServiceYears)
+  const numberOfYearlyEntitledDays = Math.min(firstYearServiceEntitlement + yearlyAddedNumberOfDays * numberOfServiceYears, maxYearlyLeaveEntitlementDays)
+
+  if(numberOfServiceYears < 1 || lastApprovedAnnualLeave && (currentYear - new Date(lastApprovedAnnualLeave.updatedAt as Date).getFullYear()) < 1){
+    return -1
+  }
+  if(numberOfServiceYears % 2 !== 0){
+    return numberOfYearlyEntitledDays
+  }else{
+    const newBalance = annualLeaveBalance?.balance && (new Date(annualLeaveBalance.updatedAt).getFullYear() - currentYear) >= 1 || !annualLeaveBalance ? Math.min(numberOfYearlyEntitledDays-1, maxYearlyLeaveEntitlementDays) + numberOfYearlyEntitledDays
+    : annualLeaveBalance?.balance as number + numberOfYearlyEntitledDays
+    return newBalance
+  }
+ 
+}

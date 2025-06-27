@@ -10,7 +10,7 @@ export async function POST(request: Request) {
   try {
     // Verify authentication
     const session = await getServerSession(authOptions);
-    if (!session || session.user?.role !== "Employee") {
+    if (!session){// || session.user?.role !== "Employee") {
       return NextResponse.json(
         { 
           matched: false,
@@ -86,7 +86,7 @@ export async function POST(request: Request) {
     }
 
     // Register attendance if matched
-    const markAttendance = await registerAttendanceByEmployee(session.user.id);
+    const markAttendance = await registerAttendanceByEmployee(Number(session.user.id));
     console.log("attendance: ", markAttendance)
     const attendanceResult = {status: markAttendance.successMsg? "success" : "error", message: markAttendance?.errorMsg || "Attendance registered"}//await registerAttendanceByEmployee(session.user.id);
 

@@ -94,6 +94,7 @@ AttendanceEditModalProps) => {
               Morning Check-In
             </label>
             <input type="hidden" name="employeeId" value={employeeId} />
+            <input type="hidden" name="attendanceId" value={attendance?.id} />
             <input type="hidden" name="date" value={attendance?.date.toDateString()} />
             <input type="hidden" name="selectedDate" value={selectedDate?.toDateString()} />
             <input type="hidden" name="supId" value={supId} />
@@ -113,7 +114,7 @@ AttendanceEditModalProps) => {
                         hour: "2-digit",
                         minute: "2-digit",
                         hour12: false,
-                        timeZone: 'UTC'
+                        timeZone: 'Africa/Addis_Ababa'
                         
                       }
                     )
@@ -142,7 +143,7 @@ AttendanceEditModalProps) => {
                     hour: "2-digit",
                     minute: "2-digit",
                     hour12: false,
-                    timeZone: 'UTC'
+                    timeZone: 'Africa/Addis_Ababa'
                   })
                 : JSON.parse(attendanceSettings?.find(item => item.key === 'attendance_time')?.value!).check_in.morning}
               max={JSON.parse(attendanceSettings?.find(item => item.key === 'attendance_time')?.value!).check_out.morning}
@@ -157,7 +158,7 @@ AttendanceEditModalProps) => {
                         hour: "2-digit",
                         minute: "2-digit",
                         hour12: false,
-                        timeZone: 'UTC'
+                        timeZone: 'Africa/Addis_Ababa'
                       }
                     )
                   : ""
@@ -189,7 +190,7 @@ AttendanceEditModalProps) => {
                       hour: "2-digit",
                       minute: "2-digit",
                       hour12: false,
-                      timeZone: 'UTC'
+                      timeZone: 'Africa/Addis_Ababa'
                     })
                   : ""
               }
@@ -216,7 +217,7 @@ AttendanceEditModalProps) => {
                     hour: "2-digit",
                     minute: "2-digit",
                     hour12: false,
-                    timeZone: 'UTC'
+                    timeZone: 'Africa/Addis_Ababa'
                   })
                 : JSON.parse(attendanceSettings?.find(item => item.key === 'attendance_time')?.value!).check_in.afternoon}
               max={JSON.parse(attendanceSettings?.find(item => item.key === 'attendance_time')?.value!).check_out.afternoon}
@@ -231,7 +232,7 @@ AttendanceEditModalProps) => {
                       hour: "2-digit",
                       minute: "2-digit",
                       hour12: false,
-                      timeZone: 'UTC'
+                      timeZone: 'Africa/Addis_Ababa'
                     })
                   : ""
               }

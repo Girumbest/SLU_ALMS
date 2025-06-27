@@ -4,8 +4,9 @@ import FaceRecognition from '@/components/FaceDetection1'; // Your existing comp
 import { useSession } from 'next-auth/react';
 import { getEmployeeAttendanceHistory, registerAttendanceByEmployee } from '@/features/hr-admin/actions';
 import toast from 'react-hot-toast';
-//THIS FILE IS JUST A BACKUP FOR EMPLOYEE ATTENDANCE PAGE!
+
 interface AttendanceRecord {
+  [x: string]: any;
   id: string;
   userId: string; // Add userId field
   date: Date;
@@ -43,7 +44,10 @@ export default function AttendancePage() {
       try {
         const response = session?.user && await registerAttendanceByEmployee(Number(session?.user?.id), true)
         if(!response){return toast.error('Error fetching attendance register status');}
-        if(response?.isWorkingDay === false){setIsWorkingDay(false); return}
+        if(response?.isWorkingDay === false){setIsWorkingDay(false); 
+          setToastMessage("Not a work day.")
+         return
+        }
         if(response?.onLeave){setIsOnLeave(true); return}
         console.log("status: ",response)
         setAttendanceRegisterStatus(response as AttendanceRegisterStatus);
@@ -147,6 +151,8 @@ export default function AttendancePage() {
       return true
     }
 
+    
+
     if(attendanceRegisterStatus && !attendanceRegisterStatus?.timeOfTheDay){
       setToastMessage("Not within attendance time.")
       return true
@@ -158,6 +164,12 @@ export default function AttendancePage() {
     }
     if(attendanceRegisterStatus && isClockedIn && !attendanceRegisterStatus?.checkOutEnabled){
       setToastMessage("Already clocked-in.")
+      return true
+    }
+    //check for lateness
+    if(attendanceRegisterStatus && attendanceRegisterStatus.isLateForClockIn && !attendanceRegisterStatus?.lateClockInEnabled){
+      // alert(attendanceRegisterStatus?.lateClockInEnabled)
+      setToastMessage("Not within attendance time.")
       return true
     }
     return false;
@@ -174,7 +186,14 @@ export default function AttendancePage() {
           background: "#1E88E5"
         }
       })
+    }else{
+      toastMessage && toast(toastMessage, {
+        style:{
+          background: "#1E88E5"
+        }
+      })
     }
+
   }
 
   const handleClockAction = () => {
@@ -233,37 +252,42 @@ export default function AttendancePage() {
         
         {/* Clock In/Out Button */}
         <div className="flex flex-col items-center justify-center mb-12">
-          <button
-            disabled={isDisabled}
-            onMouseOver={() => displayToastMessage()}
-            onClick={handleClockAction}
-            className={`relative overflow-hidden px-8 py-4 rounded-lg text-white font-bold text-lg shadow-lg transform transition-all duration-300 hover:scale-105 focus:outline-none focus:ring-2 focus:ring-offset-2 ${
-              isDisabled 
-                ? 'bg-gray-500 cursor-not-allowed' 
-                :
-              isClockedIn 
-                ? 'bg-red-500 hover:bg-red-600 focus:ring-red-500' 
-                : 'bg-green-500 hover:bg-green-600 focus:ring-green-500'
-            }`}
-          >
-            <span className="relative z-10">
-              {isClockedIn ? 'Clock Out' : 'Clock In'}
-            </span>
-            <span 
-              className={`absolute inset-0 z-0 bg-black bg-opacity-10 transition-opacity duration-300 ${
-                isClockedIn ? 'hover:bg-opacity-20' : 'hover:bg-opacity-20'
-              }`}
-            ></span>
-            <span 
-              className={`absolute inset-0 rounded-lg ${
+          <span  className="inline-block"> {/* Wrapper element onMouseOver={isDisabled ? displayToastMessage : undefined}*/}
+            <button
+              disabled={isDisabled}
+              onClick={!isDisabled ? handleClockAction : undefined} // Prevent click if disabled
+              className={`relative overflow-hidden px-8 py-4 rounded-lg text-white font-bold text-lg shadow-lg transform transition-all duration-300 ${!isDisabled ? 'hover:scale-105' : ''} focus:outline-none ${!isDisabled ? 'focus:ring-2 focus:ring-offset-2' : ''} ${
                 isDisabled
-                ? 'bg-gray-500'
-                : 
-                isClockedIn ? 'bg-red-600' : 'bg-green-600'
-              } opacity-0 hover:opacity-100 transition-opacity duration-300`}
-            ></span>
-          </button>
+                  ? 'bg-gray-500 cursor-not-allowed'
+                  :
+                  isClockedIn
+                    ? 'bg-red-500 hover:bg-red-600 focus:ring-red-500'
+                    : 'bg-green-500 hover:bg-green-600 focus:ring-green-500'
+              }`}
+              // Conditionally apply pointer-events if you want to ensure the button itself doesn't capture hover when disabled
+              // style={isDisabled ? { pointerEvents: 'none' } : {}}
+            >
+              <span className="relative z-10">
+                {isClockedIn ? 'Clock Out' : 'Clock In'}
+              </span>
+              {!isDisabled && ( // Only show hover effects if not disabled
+                <>
+                  <span
+                    className={`absolute inset-0 z-0 bg-black bg-opacity-10 transition-opacity duration-300 ${
+                      isClockedIn ? 'hover:bg-opacity-20' : 'hover:bg-opacity-20'
+                    }`}
+                  ></span>
+                  <span
+                    className={`absolute inset-0 rounded-lg ${
+                      isClockedIn ? 'bg-red-600' : 'bg-green-600'
+                    } opacity-0 hover:opacity-100 transition-opacity duration-300`}
+                  ></span>
+                </>
+              )}
+            </button>
+          </span>
           {!isDisabled && <span className={`text-sm text-gray-500 mt-2`}>{attendanceRegisterStatus?.isLateForClockIn ? "You are late" : attendanceRegisterStatus?.isEarlyForClockOut ? "You are early" : ""}</span>}
+              {toastMessage && <span className={`text-sm text-red-500 mt-2`}>{toastMessage}</span>}
         </div>
 
         {/* Attendance History */}
@@ -308,9 +332,9 @@ export default function AttendancePage() {
                       </div>
                     </div>
                     <div className="text-right">
-                      <p className="text-sm text-gray-500"><span>M-Clock In: {record?.morningCheckInTime ? new Date(record?.morningCheckInTime)?.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: false, timeZone: 'UTC' }) : '--:--:--'}</span><span className='ml-2'>{record.checkOutEnabled && "M-Clock Out: "}</span><span>{record?.morningCheckOutTime ? new Date(record?.morningCheckOutTime)?.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: false, timeZone: 'UTC' }) : record.checkOutEnabled ? '--:--:--' : ''}</span></p>
-                      <p className="text-sm text-gray-500"><span>A-Clock In: {record?.afternoonCheckInTime ? new Date(record?.afternoonCheckInTime)?.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: false, timeZone: 'UTC' }) : '--:--:--'}</span><span className='ml-2'>{record.checkOutEnabled && "A-Clock Out: "}</span><span>{record?.afternoonCheckOutTime ? new Date(record?.afternoonCheckOutTime)?.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: false, timeZone: 'UTC' }) : record.checkOutEnabled ? '--:--:--' : ''}</span></p>
-                      
+                      <p className="text-sm text-gray-500"><span>M-Clock In: {record?.morningCheckInTime ? new Date(record?.morningCheckInTime)?.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: false, timeZone: 'Africa/Addis_Ababa' }) : '--:--:--'}</span><span className='ml-2'>{record.checkOutEnabled && "M-Clock Out: "}</span><span>{record?.morningCheckOutTime ? new Date(record?.morningCheckOutTime)?.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: false, timeZone: 'Africa/Addis_Ababa' }) : record.checkOutEnabled ? '--:--:--' : ''}</span></p>
+                      <p className="text-sm text-gray-500"><span>A-Clock In: {record?.afternoonCheckInTime ? new Date(record?.afternoonCheckInTime)?.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: false, timeZone: 'Africa/Addis_Ababa' }) : '--:--:--'}</span><span className='ml-2'>{record.checkOutEnabled && "A-Clock Out: "}</span><span>{record?.afternoonCheckOutTime ? new Date(record?.afternoonCheckOutTime)?.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: false, timeZone: 'Africa/Addis_Ababa' }) : record.checkOutEnabled ? '--:--:--' : ''}</span></p>
+                      {record?.manuallyCheckedIn || <p className="text-xs text-pretty text-gray-300">Manually Registered</p>}
                       {/* <p className="text-sm text-gray-500">
                         Clock Out: {record.clockOut || '--:--:--'}
                       </p> */}

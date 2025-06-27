@@ -43,7 +43,7 @@ export default function EmployeeRegisterForm({departments}: {departments: {name:
     if(state.successMsg){
       toast.success(state.successMsg)
       // Request the form to reset once the action has completed
-      // formRef.current?.reset();
+      formRef.current?.reset();
     }else if(state.errorMsg){
       toast.error(state.errorMsg)
     }

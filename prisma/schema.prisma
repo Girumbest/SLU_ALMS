@@ -106,6 +106,8 @@ model Attendance {
   manuallyCheckedIn   Boolean @default(false)
 
   user         User      @relation(fields: [userId], references: [id])
+
+  @@unique([userId, date]) // Composite unique index
 }
 
 
@@ -117,7 +119,7 @@ model LeaveRequest {
   endDate     DateTime
   status      LeaveStatus @default(PENDING)
   reason      String
-  
+  days        Int?
   isApprovedBySupervisor  Boolean? @default(false)
   isApprovedByAdmin  Boolean? @default(false)
   createdAt               DateTime @default(now())
@@ -139,7 +141,7 @@ model LeaveBalance {
 
 model LeaveType {
   id          Int       @id @default(autoincrement())
-  name        String
+  name        String    @unique
   description String?
   maxDays     Int
   accrued Boolean @default(false)

@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, useState } from 'react';
 import * as faceapi from 'face-api.js';
+import toast from 'react-hot-toast';
 
 interface FaceRecognitionProps {
   onSuccess: (userId: string) => void;
@@ -9,6 +10,8 @@ interface FaceRecognitionProps {
 }
 
 type FaceMatchResult = {
+  message: string;
+  error: any;
   user?: {
     id: string;
     name: string;
@@ -20,11 +23,12 @@ type FaceMatchResult = {
 export default function FaceRecognition({ onSuccess, onClose }: FaceRecognitionProps) {
   const videoRef = useRef<HTMLVideoElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
-  const [recognitionStatus, setRecognitionStatus] = useState<string>('Loading models...');
+  const [recognitionStatus, setRecognitionStatus] = useState<string>('Initializing...');
   const [isRecognized, setIsRecognized] = useState(false);
   const [recognizedUser, setRecognizedUser] = useState<{id: string, name: string} | null>(null);
   const streamRef = useRef<MediaStream | null>(null);
 
+  const [isApiErrorMessageRead, setIsApiErrorMessageRead] = useState(false)
   // Function to send face descriptor to server
   const compareFaceDescriptor = async (descriptor: Float32Array): Promise<FaceMatchResult> => {
     try {
@@ -35,16 +39,17 @@ export default function FaceRecognition({ onSuccess, onClose }: FaceRecognitionP
         },
         body: JSON.stringify({ descriptor: Array.from(descriptor) }),
       });
+      
+      const data = await response.json();
 
       if (!response.ok) {
-        throw new Error('Face recognition API error');
+        return {matched: false, distance: 0, error: true, message: data.message}
       }
 
-      const data = await response.json();
       return data;
     } catch (error) {
       console.error('Error comparing face:', error);
-      return { distance: 0, matched: false };
+      return { distance: 0, matched: false, error: true, message: 'Client-side error: Could not reach server.' };
     }
   };
 
@@ -58,41 +63,35 @@ export default function FaceRecognition({ onSuccess, onClose }: FaceRecognitionP
   useEffect(() => {
     let intervalId: NodeJS.Timeout;
 
-    const loadModels = async () => {
-      try {
-        setRecognitionStatus('Loading face detection models...');
-        await faceapi.nets.tinyFaceDetector.loadFromUri('/models');
-        await faceapi.nets.faceLandmark68Net.loadFromUri('/models');
-        await faceapi.nets.faceRecognitionNet.loadFromUri('/models');
-        setRecognitionStatus('Starting camera...');
-        await startVideo();
-      } catch (error) {
-        console.error('Error loading models:', error);
-        setRecognitionStatus('Error loading models');
-      }
-    };
+    // Models are now preloaded by the parent component.
+    // This effect will focus on starting the video and detection.
 
-    const startVideo = async () => {
+    const startVideoAndSetupDetection = async () => {
       try {
-        const stream = await navigator.mediaDevices.getUserMedia({ 
-          video: { width: 720, height: 560 } 
+        setRecognitionStatus('Starting camera...');
+        const stream = await navigator.mediaDevices.getUserMedia({
+          video: { width: 720, height: 560 }
         });
         streamRef.current = stream;
         if (videoRef.current) {
           videoRef.current.srcObject = stream;
+          // The 'play' event listener will handle starting detection.
+        } else {
+          setRecognitionStatus('Video element not found.');
+          // Consider calling onClose if this is a critical failure
         }
       } catch (err) {
         console.error('Error accessing camera:', err);
-        setRecognitionStatus('Camera access denied');
+        setRecognitionStatus('Camera access denied. Please check permissions.');
+        toast.error("Camera access denied. Please check permissions and try again.");
+        onClose(); // Close the modal if camera access fails
       }
     };
 
     const onPlay = async () => {
       if (!videoRef.current || !canvasRef.current || isRecognized) return;
-
       const video = videoRef.current;
       const canvas = canvasRef.current;
-
       // Set canvas dimensions to match video
       canvas.width = video.videoWidth;
       canvas.height = video.videoHeight;
@@ -100,6 +99,7 @@ export default function FaceRecognition({ onSuccess, onClose }: FaceRecognitionP
       const displaySize = { width: video.videoWidth, height: video.videoHeight };
       faceapi.matchDimensions(canvas, displaySize);
 
+      setRecognitionStatus('Detecting face...'); // Update status once video plays
       let lastSentTime = 0;
 
       intervalId = setInterval(async () => {
@@ -120,7 +120,15 @@ export default function FaceRecognition({ onSuccess, onClose }: FaceRecognitionP
             if (now - lastSentTime > 2000) {
               lastSentTime = now;
               const matchResult = await compareFaceDescriptor(currentDescriptor);
-              
+              if(matchResult?.error){
+                !isApiErrorMessageRead && toast.error(matchResult.message)
+                setIsApiErrorMessageRead(!isApiErrorMessageRead)
+                setIsRecognized(true);
+                stopVideoStream();
+                clearInterval(intervalId);
+                onClose()
+                return
+              }
               if (matchResult.matched && matchResult.user) {
                 setRecognizedUser(matchResult.user);
                 setIsRecognized(true);
@@ -152,38 +160,38 @@ export default function FaceRecognition({ onSuccess, onClose }: FaceRecognitionP
       }, 100);
     };
 
-    loadModels();
+    startVideoAndSetupDetection();
 
-    const video = videoRef.current;
-    if (video) {
-      video.addEventListener('play', onPlay);
+    const videoElement = videoRef.current;
+    if (videoElement) {
+      videoElement.addEventListener('play', onPlay);
     }
 
     return () => {
       clearInterval(intervalId);
-      if (video) {
-        video.removeEventListener('play', onPlay);
+      if (videoElement) {
+        videoElement.removeEventListener('play', onPlay);
       }
       stopVideoStream();
     };
-  }, [isRecognized, onSuccess]);
+  }, [isRecognized, onSuccess, onClose]); // Added onClose to dependencies
 
   return (
     <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-      <div className="bg-white rounded-lg p-6 max-w-4xl w-full mx-4">
+      <div className="bg-white rounded-lg p-4 max-w-md w-full mx-4 my-4"> {/* Adjusted max-w and added my-4 */}
         <div className="flex justify-between items-center mb-4">
-          <h2 className="text-xl font-semibold">Face Recognition</h2>
+          <h2 className="text-lg font-semibold">Face Recognition</h2> {/* Reduced text size */}
           <button 
             onClick={onClose}
             className="text-gray-500 hover:text-gray-700"
           >
-            <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"> {/* Reduced icon size */}
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
             </svg>
           </button>
         </div>
 
-        <div className="relative w-full aspect-video bg-black rounded-lg overflow-hidden">
+        <div className="relative w-full aspect-square bg-black rounded-lg overflow-hidden"> {/* Changed aspect-video to aspect-square */}
           {!isRecognized ? (
             <>
               <video 
@@ -200,12 +208,12 @@ export default function FaceRecognition({ onSuccess, onClose }: FaceRecognitionP
             </>
           ) : (
             <div className="flex flex-col items-center justify-center h-full p-4 text-center">
-              <div className="w-20 h-20 bg-green-100 rounded-full flex items-center justify-center mb-4">
-                <svg xmlns="http://www.w3.org/2000/svg" className="h-10 w-10 text-green-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <div className="w-16 h-16 bg-green-100 rounded-full flex items-center justify-center mb-4"> {/* Reduced size */}
+                <svg xmlns="http://www.w3.org/2000/svg" className="h-8 w-8 text-green-500" fill="none" viewBox="0 0 24 24" stroke="currentColor"> {/* Reduced icon size */}
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
                 </svg>
               </div>
-              <h3 className="text-xl font-semibold mb-1">Successfully Recognized</h3>
+              <h3 className="text-lg font-semibold mb-1">Successfully Recognized</h3> {/* Reduced text size */}
               {recognizedUser && (
                 <p className="text-gray-600">Welcome, {recognizedUser.name}</p>
               )}
@@ -221,7 +229,7 @@ export default function FaceRecognition({ onSuccess, onClose }: FaceRecognitionP
 
         <div className="mt-4 p-3 bg-gray-50 rounded-lg">
           <div className="flex items-center">
-            <div className={`w-3 h-3 rounded-full mr-2 ${
+            <div className={`w-2 h-2 rounded-full mr-2 ${ /* Reduced size */
               isRecognized ? 'bg-green-500' : 
               recognitionStatus.includes('detected') ? 'bg-yellow-500' : 'bg-gray-500'
             }`}></div>

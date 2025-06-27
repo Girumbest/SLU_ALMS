@@ -105,7 +105,7 @@ const [isPrinting, setIsPrinting] = useState(false)
         'Job Title': employee.jobTitle || 'N/A',
         Department: employee.department?.name || 'N/A',
         Role: employee.role,
-        Salary: employee.salary ? `$${employee.salary.toLocaleString()}` : 'N/A',
+        Salary: employee.salary ? `Birr${employee.salary.toLocaleString()}` : 'N/A',
         'Hire Date': employee.hireDate 
           ? new Date(employee.hireDate).toLocaleDateString('en-GB', { 
               day: '2-digit', 
@@ -324,7 +324,7 @@ const [isPrinting, setIsPrinting] = useState(false)
                       title={employee[field as keyof Employee]?.toString()}
                     >
                       {field === "salary"
-                        ? `$${employee.salary?.toLocaleString() || "N/A"}`
+                        ? `Birr ${employee.salary?.toLocaleString() || "N/A"}`
                         : field === "hireDate"
                         ? new Date(employee.hireDate!).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' })
                         : field === "department"

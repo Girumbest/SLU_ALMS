@@ -2,7 +2,10 @@
 import React, { useState } from "react";
 import { 
   FaHome, FaCalendarCheck, FaCalendarTimes, 
-  FaCalendar, FaSignOutAlt, FaBars, FaSitemap 
+  FaCalendar, FaSignOutAlt, FaBars, FaSitemap, 
+  FaPaperPlane,
+  FaCalendarAlt,
+  FaHistory
 } from "react-icons/fa";
 import { useRouter, usePathname } from "next/navigation";
 import Image from "next/image";
@@ -12,16 +15,16 @@ import Link from "next/link";
 const EmployeeSidebar = () => {
   const router = useRouter();
   const [isCollapsed, setIsCollapsed] = useState(false);
-  const [isProfileOpen, setIsProfileOpen] = useState(false);
   const pathname = usePathname();
+  const [isProfileOpen, setIsProfileOpen] = useState(false);
   const {data:session, status: sessionStatus} = useSession();
   
 
   const menuItems = [
     // { name: "Dashboard", icon: <FaHome />, path: "/admin/dashboard" },
     { name: "Attendance", icon: <FaCalendarCheck />, path: "/" },
-    { name: "Request Leave", icon: <FaSitemap />, path: "/leave/request" },
-    { name: "Leave History", icon: <FaCalendarTimes />, path: "/leave/history" },
+    { name: "Request Leave", icon: <FaPaperPlane />, path: "/leave/request" },
+    { name: "Leave History", icon: <FaHistory />, path: "/leave/history" },
     { name: "Calendar", icon: <FaCalendar />, path: "/calendar" },
     { name: "Logout", icon: <FaSignOutAlt />, path: "#" },
   ];
@@ -57,7 +60,7 @@ const EmployeeSidebar = () => {
         )}
         <button 
           onClick={() => setIsCollapsed(!isCollapsed)} 
-          className={`text-xl hover:text-blue-400 transition-colors focus:outline-none ${isCollapsed ? "absolute left-0 top-10  text-gray-600" : "relative"}`}
+          className={`text-xl hover:text-blue-400 transition-colors focus:outline-none ${isCollapsed ? "absolute top-5  text-gray-600" : "relative"}`}
           aria-label={isCollapsed ? "Expand sidebar" : "Collapse sidebar"}
         >
           <FaBars />

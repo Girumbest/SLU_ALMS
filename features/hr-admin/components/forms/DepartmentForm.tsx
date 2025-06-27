@@ -55,7 +55,7 @@ const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
           </div>
 
           <div className='flex flex-col relative'>
-          <input type="text" name="nameAmharic" placeholder="የመምሪያው ስም" className="p-2 border rounded" />
+          <input type="text" name="nameAmharic" placeholder="የዲፓርትመንት ስም" className="p-2 border rounded" />
           {state.errors?.nameAmharic && <p className="text-red-500 text-sm error-message -bottom-30">{state.errors.nameAmharic [0]}</p>}
           </div>
 

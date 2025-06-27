@@ -266,7 +266,7 @@ const generateCSVReport =  () => {
         Username: employee.username,
         Department: employee.department?.name || 'N/A',
         'Morning Check-In': attendance.morningCheckInTime 
-          ? new Date(attendance.morningCheckInTime).toLocaleTimeString('en-US', {
+          ? new Date(attendance.morningCheckInTime).toLocaleTimeString('en-Us', {
               hour: '2-digit', 
               minute: '2-digit',
               hour12: false,
@@ -552,7 +552,7 @@ const handlePrint = () => {
                             hour: "2-digit",
                             minute: "2-digit",
                             hour12: false,
-                            timeZone: "UTC",
+                            timeZone: "Africa/Nairobi",
                           })}
                           {/* Status Badge */}
                           {i == 0 &&

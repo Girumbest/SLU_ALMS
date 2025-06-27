@@ -69,6 +69,7 @@ const LeaveRequestDetailTable: React.FC<EmployeeTableProps> = ({ departments, em
   const [actionLoading, setActionLoading] = useState<boolean>(false);
   const [rejectActionLoading, setRejectActionLoading] = useState<boolean>(false);
 
+  const [reload, setReload] = useState(false)
   const {data: session, status: sessionStatus} = useSession();
 
 
@@ -84,7 +85,7 @@ const LeaveRequestDetailTable: React.FC<EmployeeTableProps> = ({ departments, em
       setDataLoading(false);
     };
     fetchData();
-  }, []);
+  }, [reload]);
 
   const handleDateRangeChange = (startDate: string, endDate: string) => {
     if (!startDate && !endDate) {
@@ -102,7 +103,7 @@ const LeaveRequestDetailTable: React.FC<EmployeeTableProps> = ({ departments, em
     const leaveCancel = await cancelLeave(leaveId);
     if(leaveCancel?.successMsg){
       toast.success(leaveCancel.successMsg)
-      
+      setReload(true)
     }
     if(leaveCancel?.errorMsg){
       toast.error(leaveCancel.errorMsg)
@@ -191,7 +192,7 @@ const LeaveRequestDetailTable: React.FC<EmployeeTableProps> = ({ departments, em
     }
    if(column == "days"){
     setFilteredLeaves(
-      leaves.filter((leave) => (leave.endDate.getDate() - leave.startDate.getDate()) == Number(value))
+      leaves.filter((leave) => (leave.days) == Number(value))
     ) 
   }
   if (column == "createdat"){
@@ -468,21 +469,7 @@ const [isPrinting, setIsPrinting] = useState(false)
                     index % 2 === 0 ? "bg-gray-100" : "bg-white"
                   } hover:bg-gray-200`}
                 >
-                  {/* <td className="p-3">
-                    <img
-                      suppressHydrationWarning
-                      src={
-                        "/api/photos/" + leave.user.photograph ||
-                        "/default-profile.png"
-                      }
-                      alt={`${leave.user.firstName} ${leave.user.lastName}`}
-                      className="w-12 h-12 object-cover rounded-full border-2 border-gray-300"
-                    />
-                  </td>
-
-                  <td className="p-3 font-semibold text-gray-900 whitespace-nowrap">
-                    {leave.user.firstName} {leave.user.lastName}
-                  </td> */}
+                  
                   {[
                     // "username",
                     // "department",
@@ -506,10 +493,10 @@ const [isPrinting, setIsPrinting] = useState(false)
                         ? leave.user.department?.name
                         : field === "username"
                         ? leave.user.username
-                        
-                        : leave[field as keyof LeaveRequest]?.toString()}
-                        {field === "days" && (leave.endDate.getDate() - leave.startDate.getDate())}
-
+                        : field === "days"
+                        ? leave?.days
+                        : leave[field as keyof LeaveRequest]?.toString()
+                      }
                     </td>
                   ))}
 

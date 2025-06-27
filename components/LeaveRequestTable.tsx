@@ -183,7 +183,7 @@ const LeaveRequestTable: React.FC<EmployeeTableProps> = ({ departments }) => {
     }
    if(column == "days"){
     setFilteredLeaves(
-      leaves.filter((leave) => (leave.endDate.getDate() - leave.startDate.getDate()) == Number(value))
+      leaves.filter((leave) => {return value ? (leave.days) == Number(value) : true})
     ) 
   }
 
@@ -471,8 +471,9 @@ const [isPrinting, setIsPrinting] = useState(false)
                         ? leave.user.department?.name
                         : field === "username"
                         ? leave.user.username
+                        : field === "days"
+                        ? leave?.days
                         : leave[field as keyof LeaveRequest]?.toString()}
-                        {field === "days" && (leave.endDate.getDate() - leave.startDate.getDate())}
 
                     </td>
                   ))}

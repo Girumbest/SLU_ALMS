@@ -3,7 +3,8 @@ import React, { useState, useRef } from "react";
 import { 
   FaHome, FaUsers, FaBuilding, FaCog, FaSignOutAlt, 
   FaBars, FaChevronDown, FaCalendarCheck, FaCalendarTimes, 
-  FaSitemap, FaUserPlus, FaAddressBook, FaCalendar 
+  FaSitemap, FaUserPlus, FaAddressBook, FaCalendar, 
+  FaList
 } from "react-icons/fa";
 import { useRouter, usePathname } from "next/navigation";
 import Image from "next/image";
@@ -53,7 +54,7 @@ const AdminSidebar = () => {
       path: "#",
       subItems: [
         { name: "Leave Requests", icon: <FaCalendarTimes />, path: "/admin/leave" },
-        { name: "Leave Types", icon: <FaCalendarTimes />, path: "/admin/leave/leave-types" }
+        { name: "Leave Types", icon: <FaList />, path: "/admin/leave/leave-types" }
       ]
     },
     { name: "Calendar", icon: <FaCalendar />, path: "/admin/calendar" },
@@ -195,21 +196,23 @@ const AdminSidebar = () => {
       ${isCollapsed ? "w-16" : "w-64"}`}
     >
       {/* Header */}
-      <div className="p-4 flex items-center justify-between border-b border-gray-700">
-        {!isCollapsed && (
-          <div className="flex items-center justify-between">
-            <Image 
-              src="/logo.png" 
-              alt="Logo" 
-              width={40} 
-              height={40} 
-              className="rounded"
-              priority
-            />
-            <span className="ml-3 text-lg font-semibold">Admin Panel</span>
-          </div>
-        )}
-        <button 
+      <div className="p-4 flex items-center justify-between w-full border-b border-gray-700">
+        <div className={`flex items-center justify-between ${!isCollapsed && 'min-w-[85%]'} `}> {/* This div is always present */}
+          {!isCollapsed && (
+            <> {/* Use a fragment for the conditionally rendered logo and text */}
+              <Image 
+                src="/logo.png" 
+                alt="Logo" 
+                width={40} 
+                height={40} 
+                className="rounded"
+                priority
+              />
+              <span className=" mr-3 text-md font-semibold">Admin Panel</span>
+            </>
+          )}
+        </div>
+        <button
           onClick={() => setIsCollapsed(!isCollapsed)} 
           className="text-xl hover:text-blue-400 transition-colors focus:outline-none"
           aria-label={isCollapsed ? "Expand sidebar" : "Collapse sidebar"}
@@ -240,7 +243,7 @@ const AdminSidebar = () => {
             {!isCollapsed && (
               <div className="ml-3 overflow-hidden">
                 <p className="font-medium truncate">{session?.user?.name}</p>
-                <p className="text-xs text-gray-400 truncate">{session?.user?.email}</p>
+                <p className="text-xs text-gray-400 truncate">{session?.user?.role}</p>
               </div>
             )}
           </div>
@@ -258,7 +261,7 @@ const AdminSidebar = () => {
           <div className="absolute bottom-16 left-4 bg-gray-800 text-white rounded-lg shadow-xl overflow-hidden w-56 z-10">
             <div className="p-4 border-b border-gray-700">
               {/* <p className="font-medium">{session?.user?.name}</p> */}
-              <p className="text-sm text-gray-400 truncate">{session?.user?.email}</p>
+              <p className="text-sm text-gray-400 truncate">{session?.user?.name}</p>
             </div>
             <Link 
               href={`/admin/employees/${session?.user?.name}`}

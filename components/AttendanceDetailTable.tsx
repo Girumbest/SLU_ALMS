@@ -168,7 +168,7 @@ const AttendanceDetailTable: React.FC<AttendanceTableProps> = ({ departments, em
               hour: '2-digit', 
               minute: '2-digit',
               hour12: false,
-              timeZone: 'UTC'
+              timeZone: 'Africa/Addis_Ababa'
             }) + (attendance.isLateMorningCheckIn ? ' (Late)' : ' (On Time)')
           : '-',
         'Morning Check-Out': attendance.morningCheckOutTime 
@@ -176,7 +176,7 @@ const AttendanceDetailTable: React.FC<AttendanceTableProps> = ({ departments, em
               hour: '2-digit', 
               minute: '2-digit',
               hour12: false,
-              timeZone: 'UTC'
+              timeZone: 'Africa/Addis_Ababa'
             }) + (attendance.isEarlyMorningCheckOut ? ' (Early)' : ' (On Time)')
           : attendance.checkOutEnabled ? '-' : 'N/A',
         'Afternoon Check-In': attendance.afternoonCheckInTime 
@@ -184,7 +184,7 @@ const AttendanceDetailTable: React.FC<AttendanceTableProps> = ({ departments, em
               hour: '2-digit', 
               minute: '2-digit',
               hour12: false,
-              timeZone: 'UTC'
+              timeZone: 'Africa/Addis_Ababa'
             }) + (attendance.isLateAfternoonCheckIn ? ' (Late)' : ' (On Time)')
           : '-',
         'Afternoon Check-Out': attendance.afternoonCheckOutTime 
@@ -192,7 +192,7 @@ const AttendanceDetailTable: React.FC<AttendanceTableProps> = ({ departments, em
               hour: '2-digit', 
               minute: '2-digit',
               hour12: false,
-              timeZone: 'UTC'
+              timeZone: 'Africa/Addis_Ababa'
             }) + (attendance.isEarlyAfternoonCheckOut ? ' (Early)' : ' (On Time)')
           : attendance.checkOutEnabled ? '-' : 'N/A',
         Status: attendance.status 
@@ -420,7 +420,7 @@ const AttendanceDetailTable: React.FC<AttendanceTableProps> = ({ departments, em
                             hour: "2-digit",
                             minute: "2-digit",
                             hour12: false,
-                            timeZone: "UTC",
+                            timeZone: "Africa/Addis_Ababa",
                           })}
                           {/* Status Badge */}
                           {i == 0 &&
