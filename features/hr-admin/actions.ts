@@ -1463,37 +1463,35 @@ export async function createLeaveRequest(
             leaveTypeId: Number(leaveTypeId),
           }
         }
-      })
-      await prisma.leaveRequest.create({
-        data: {
-          userId: Number(empId),
-          leaveTypeId: Number(leaveTypeId),
-          startDate: new Date(startDate),
-          endDate: new Date(endDate),
-          days,
-          reason: reason,
-          status: "PENDING",
-        },
       });
-      //update balance
-      if(!existingLeaveBalance){
-        await prisma.leaveBalance.create({
+      await prisma.$transaction(async (tx) => {
+        await tx.leaveRequest.create({
           data: {
             userId: Number(empId),
             leaveTypeId: Number(leaveTypeId),
-            balance: newAnnualLeaveBalance,
+            startDate: new Date(startDate),
+            endDate: new Date(endDate),
+            days,
+            reason: reason,
+            status: "PENDING",
           },
         });
-      }else{
-        await prisma.leaveBalance.update({
-          where: {
-            id: existingLeaveBalance.id,
-          },
-          data: {
-            balance: newAnnualLeaveBalance,
-          },
-        });
-      }
+        //update balance
+        if (!existingLeaveBalance) {
+          await tx.leaveBalance.create({
+            data: {
+              userId: Number(empId),
+              leaveTypeId: Number(leaveTypeId),
+              balance: newAnnualLeaveBalance,
+            },
+          });
+        } else {
+          await tx.leaveBalance.update({
+            where: { id: existingLeaveBalance.id },
+            data: { balance: newAnnualLeaveBalance },
+          });
+        }
+      });
 
       return {
         successMsg: "Leave request submitted successfully!",
@@ -1593,57 +1591,50 @@ export async function createLeaveRequest(
     }
     //==================================================================
     
-
-    if (!leaveBalance?.id) {
-      if (leaveType.maxDays < days) {
-        return {
-          errorMsg: "Insufficient leave balance.",
-        };
-      }
-      await prisma.leaveRequest.create({
-        data: {
-          userId: Number(empId),
-          leaveTypeId: Number(leaveTypeId),
-          startDate: new Date(startDate),
-          endDate: new Date(endDate),
-          days,
-          reason: reason,
-          status: "PENDING",
-        },
-      });
-      await prisma.leaveBalance.create({
-        data: {
-          userId: Number(empId),
-          leaveTypeId: Number(leaveTypeId),
-          balance: leaveType.maxDays - days,
-        },
-      });
-    } else {
-      if (leaveType.maxDays < days) {
-        return {
-          errorMsg: "Insufficient leave balance.",
-        };
-      }
-      await prisma.leaveRequest.create({
-        data: {
-          userId: Number(empId),
-          leaveTypeId: Number(leaveTypeId),
-          startDate: new Date(startDate),
-          endDate: new Date(endDate),
-          days,
-          reason: reason,
-          status: "PENDING",
-        },
-      });
-      await prisma.leaveBalance.update({
-        where: {
-          id: leaveBalance.id,
-        },
-        data: {
-          balance: leaveType.maxDays - days,
-        },
-      });
+    // For other leave types, handle balance and request creation transactionally.
+    const availableBalance = leaveBalance?.balance ?? leaveType.maxDays;
+    if (availableBalance < days) {
+      return {
+        errorMsg: "Insufficient leave balance.",
+      };
     }
+
+    await prisma.$transaction(async (tx) => {
+      // 1. Create the leave request.
+      await tx.leaveRequest.create({
+        data: {
+          userId: Number(empId),
+          leaveTypeId: Number(leaveTypeId),
+          startDate: new Date(startDate),
+          endDate: new Date(endDate),
+          days,
+          reason: reason,
+          status: "PENDING",
+        },
+      });
+
+      // 2. Create a new leave balance record or update the existing one.
+      if (!leaveBalance?.id) {
+        await tx.leaveBalance.create({
+          data: {
+            userId: Number(empId),
+            leaveTypeId: Number(leaveTypeId),
+            balance: leaveType.maxDays - days,
+          },
+        });
+      } else {
+        await tx.leaveBalance.update({
+          where: {
+            id: leaveBalance.id,
+          },
+          data: {
+            balance: {
+              decrement: days,
+            },
+          },
+        });
+      }
+    });
 
     revalidatePath("/leave/history");
     return {
@@ -1786,26 +1777,24 @@ export async function rejectLeave(leaveId: number){
     }
     //-------------------------------------------------
     const leaveDays = await calculateLeaveDays(leave?.startDate as Date, leave?.endDate as Date);
-    await prisma.leaveBalance.update({
-      where: {
-        userId_leaveTypeId: {
-          userId: leave?.userId,
-          leaveTypeId: leave?.leaveTypeId,
+    await prisma.$transaction(async (tx) => {
+      // 1. Increment the leave balance back to the user.
+      await tx.leaveBalance.update({
+        where: {
+          userId_leaveTypeId: {
+            userId: leave.userId,
+            leaveTypeId: leave.leaveTypeId,
+          },
         },
+        data: {
+          balance: { increment: leaveDays },
         },
-      data: {
-        balance: {
-          increment: leaveDays,
-        },
-      },
-    });
-    await prisma.leaveRequest.update({
-      where: {
-        id: leaveId,
-      },
-      data: {
-        status: "REJECTED",
-      },
+      });
+      // 2. Update the leave request status to REJECTED.
+      await tx.leaveRequest.update({
+        where: { id: leaveId },
+        data: { status: "REJECTED" },
+      });
     });
     revalidatePath("/admin/leave");
     revalidatePath("/supervisor/leave");
@@ -1852,23 +1841,21 @@ export async function cancelLeave(leaveId: number){
     }
     
     const leaveDays = await calculateLeaveDays(leave?.startDate as Date, leave?.endDate as Date);
-    await prisma.leaveBalance.update({
-      where: {
-        userId_leaveTypeId: {
-          userId: leave?.userId,
-          leaveTypeId: leave?.leaveTypeId,
+    await prisma.$transaction(async (tx) => {
+      // 1. Increment the leave balance back to the user.
+      await tx.leaveBalance.update({
+        where: {
+          userId_leaveTypeId: {
+            userId: leave.userId,
+            leaveTypeId: leave.leaveTypeId,
+          },
         },
+        data: {
+          balance: { increment: leaveDays },
         },
-      data: {
-        balance: {
-          increment: leaveDays,
-        },
-      },
-    });
-    await prisma.leaveRequest.delete({
-      where: {
-        id: leaveId,
-      },
+      });
+      // 2. Delete the leave request.
+      await tx.leaveRequest.delete({ where: { id: leaveId } });
     });
     revalidatePath("/leave/history");
     return { successMsg: "Leave request canceled successfully!" };
