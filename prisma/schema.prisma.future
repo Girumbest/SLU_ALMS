@@ -1,0 +1,414 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+// Looking for ways to speed up your queries, or scale easily with your serverless or edge functions?
+// Try Prisma Accelerate: https://pris.ly/cli/accelerate-init
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// The User model is now focused on authentication and core identity.
+// Personal and employment details have been moved to separate models for better separation of concerns.
+model User {
+  id        Int      @id @default(autoincrement())
+  username  String   @unique // Unique username for login
+  password  String   // Hashed password for security
+  role      Role     @default(Employee)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  // Relationships
+  profile     Profile?
+  employment  Employment?
+  attendances Attendance[]
+  leaveRequests LeaveRequest[]
+  leaveBalances LeaveBalance[]
+}
+
+// New Model: Stores personal information related to a user.
+// This separates PII (Personally Identifiable Information) from employment or auth data.
+model Profile {
+  id                    Int      @id @default(autoincrement())
+  firstName             String
+  lastName              String
+  phoneNumber           String
+  dateOfBirth           DateTime?
+  gender                Gender
+  maritalStatus         MaritalStatus?
+  emergencyContactName  String?
+  emergencyContactPhone String?
+  address               String? // For more complex needs, this could be a separate model or a JSON field.
+  photograph            String  // URL or path to the user's photograph
+  educationalLevel      String?
+  cv                    String?  // URL or path to CV or certificates (PDF)
+  createdAt             DateTime @default(now())
+  updatedAt             DateTime @updatedAt
+
+  // One-to-one relationship with User
+  userId                Int      @unique
+  user                  User     @relation(fields: [userId], references: [id])
+}
+
+// New Model: Stores employment-specific information.
+// This keeps sensitive data like salary and job details separate.
+model Employment {
+  id                Int      @id @default(autoincrement())
+  hireDate          DateTime?
+  jobTitle          String?
+  positionLevel     PositionLevel? // Changed from String to use the PositionLevel enum for type safety.
+  faceDescriptor    Float[]
+  salary            Float?
+  directDepositInfo String?  // This could be encrypted or stored in a more secure way.
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+
+  // Relationships
+  userId            Int         @unique
+  user              User        @relation(fields: [userId], references: [id])
+  departmentId      Int?
+  department        Department? @relation(fields: [departmentId], references: [id])
+}
+
+
+model Department {
+  id          Int      @id @default(autoincrement())
+  name        String   @unique
+  nameAmharic String?
+  description String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt // Made non-nullable for consistency.
+
+  employees   Employment[] // Renamed from 'users' for clarity.
+}
+
+
+enum Role {
+  Employee
+  HRAdmin
+  Supervisor
+}
+
+enum Gender {
+  Male
+  Female
+}
+
+enum MaritalStatus {
+  Single
+  Married
+  Divorced
+  Widowed
+}
+
+enum PositionLevel {
+  Junior
+  Mid
+  Senior
+}
+
+//////////////////
+
+// The Attendance model now represents a single day's attendance record.
+// Specific check-in/out events are stored in the new TimeLog model for flexibility.
+model Attendance {
+  id     Int      @id @default(autoincrement())
+  userId Int
+  date   DateTime @db.Date // Using Date type is more appropriate for a daily record.
+  status AttendanceStatus @default(ABSENT)
+  notes  String? // A field for manual overrides or notes from HR.
+
+  user     User      @relation(fields: [userId], references: [id])
+  timeLogs TimeLog[] // Relation to multiple time log entries for the day.
+
+  @@unique([userId, date])
+}
+
+// New Model: Logs each check-in and check-out event.
+// This is much more flexible than the previous four-field approach.
+model TimeLog {
+  id           Int       @id @default(autoincrement())
+  timestamp    DateTime
+  type         TimeLogType
+  isManual     Boolean   @default(false) // To flag if the entry was added manually.
+  attendanceId Int
+  attendance   Attendance @relation(fields: [attendanceId], references: [id])
+}
+
+enum TimeLogType {
+  CHECK_IN
+  CHECK_OUT
+}
+
+model LeaveRequest {
+  id                   Int         @id @default(autoincrement())
+  userId               Int
+  leaveTypeId          Int
+  startDate            DateTime
+  endDate              DateTime
+  status               LeaveStatus @default(PENDING)
+  reason               String
+  days                 Int?
+  isApprovedBySupervisor Boolean?    @default(false)
+  isApprovedByAdmin    Boolean?    @default(false)
+  createdAt            DateTime    @default(now())
+  updatedAt            DateTime    @updatedAt // Made non-nullable for consistency.
+  user                 User        @relation(fields: [userId], references: [id])
+  leaveType            LeaveType   @relation(fields: [leaveTypeId], references: [id])
+}
+
+model LeaveBalance {
+  id          Int      @id @default(autoincrement())
+  balance     Int?
+  userId      Int
+  updatedAt   DateTime @updatedAt
+  leaveTypeId Int
+  user        User     @relation(fields: [userId], references: [id])
+  leaveType   LeaveType @relation(fields: [leaveTypeId], references: [id])
+
+  @@unique([userId, leaveTypeId])
+}
+
+model LeaveType {
+  id            Int       @id @default(autoincrement())
+  name          String    @unique
+  description   String?
+  maxDays       Int
+  accrued       Boolean   @default(false)
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt // Made non-nullable for consistency.
+  leaveRequests LeaveRequest[]
+  leaveBalance  LeaveBalance[]
+}
+
+model Calendar {
+  id            Int           @id @default(autoincrement())
+  eventName     String
+  startDate     DateTime      // Renamed from eventDate for clarity with recurring events.
+  isRecurring   Boolean       @default(false)
+  recurringType RecurringType? // Changed from String to use the RecurringType enum.
+  eventEnd      DateTime?
+  eventType     EventType
+  description   String?
+  createdAt     DateTime      @default(now())
+  updatedAt     DateTime      @updatedAt
+}
+
+enum RecurringType {
+  daily
+  weekly
+  monthly
+  yearly
+}
+
+model Settings {
+  id          Int         @id @default(autoincrement())
+  key         String      @unique
+  value       String
+  type        SettingType @default(STRING)
+  description String?
+  createdAt   DateTime    @default(now())
+  updatedAt   DateTime    @updatedAt
+}
+
+enum SettingType {
+  STRING
+  NUMBER
+  BOOLEAN
+  JSON
+  DATE_TIME
+}
+
+
+enum AttendanceStatus {
+  PRESENT
+  ABSENT
+  ON_LEAVE
+}
+
+enum LeaveStatus {
+  PENDING
+  APPROVED
+  REJECTED
+}
+
+enum Language {
+  ENGLISH
+  AMHARIC
+}
+
+enum EventType {
+  HOLIDAY
+  OTHER
+}
+
+////////////////NOTE FOR ATTENDANCE STATUS UPDATE////////////////////
+Of course! That's an excellent question. The logic for handling attendance, especially for something like marking an absence, is a crucial part of the system.
+
+With the redesigned schema (Attendance + TimeLog), the logic becomes much clearer and more robust. Here’s how I would approach implementing the attendance update logic.
+
+The Core Concept: Proactive vs. Reactive
+The key is to understand that some status updates are reactive (they happen in response to a user action), while others must be proactive (the system needs to run a check to find them).
+
+Reactive (e.g., PRESENT): A user's status is set to PRESENT when they perform their first CHECK_IN for the day. This is a direct reaction to an event.
+Proactive (e.g., ABSENT, ON_LEAVE): An absence is the lack of an action. We can't wait for a user to "check in as absent." Instead, the system must proactively run a daily task to find who didn't show up.
+1. Reactive Logic: The Check-In Process
+When a user checks in (e.g., via the face recognition terminal or a manual entry), your application backend would perform the following steps.
+
+Here is a conceptual TypeScript function illustrating the logic:
+
+typescript
+import { PrismaClient, TimeLogType, AttendanceStatus } from '@prisma/client';
+
+const prisma = new PrismaClient();
+
+/**
+ * Logs a user's check-in/check-out and updates their daily attendance record.
+ * @param userId The ID of the user checking in.
+ * @param type The type of log (CHECK_IN or CHECK_OUT).
+ */
+async function logUserTime(userId: number, type: TimeLogType) {
+  const today = new Date();
+  today.setHours(0, 0, 0, 0); // Normalize to the start of the day for the date field
+
+  // Step 1: Find or create the attendance record for the day.
+  // The `upsert` operation is perfect here.
+  const attendanceRecord = await prisma.attendance.upsert({
+    where: {
+      // Use the unique constraint we defined in the schema
+      userId_date: {
+        userId: userId,
+        date: today,
+      },
+    },
+    // If it doesn't exist, create it. Set status to PRESENT because a time log is being added.
+    create: {
+      userId: userId,
+      date: today,
+      status: AttendanceStatus.PRESENT,
+    },
+    // If it exists, update it. Ensure the status is PRESENT.
+    update: {
+      status: AttendanceStatus.PRESENT,
+    },
+  });
+
+  // Step 2: Create the specific time log entry (check-in or check-out).
+  const timeLog = await prisma.timeLog.create({
+    data: {
+      timestamp: new Date(), // The exact time of the event
+      type: type,
+      attendanceId: attendanceRecord.id,
+    },
+  });
+
+  console.log(`Successfully logged ${type} for user ${userId} at ${timeLog.timestamp}`);
+  return { attendanceRecord, timeLog };
+}
+
+// Example usage:
+// logUserTime(123, TimeLogType.CHECK_IN);
+2. Proactive Logic: The Daily Absence/Leave Check
+This is the most critical part for maintaining accurate records. This logic should be implemented as a scheduled task (e.g., a cron job) that runs once per day, perhaps late at night or very early the next morning.
+
+The task's workflow:
+
+Define the Target Date: Determine which day you are checking (e.g., "yesterday").
+Check for Holidays: Query the Calendar model to see if the target date is a company-wide holiday. If so, stop.
+Get All Active Employees: Fetch all users who are expected to work.
+Iterate and Verify: For each employee:
+Check if an Attendance record for the target date already exists. If it does, they checked in, so we can skip them.
+If no record exists, check the LeaveRequest model to see if they have an approved leave for that day.
+If they are on leave, create an Attendance record with the status ON_LEAVE.
+If they are not on leave and have no attendance record, create one with the status ABSENT.
+Here is a conceptual function for this scheduled task:
+
+typescript
+import { PrismaClient, AttendanceStatus } from '@prisma/client';
+
+const prisma = new PrismaClient();
+
+/**
+ * A scheduled job to run daily to mark users who were absent or on leave.
+ */
+async function processDailyAbsences() {
+  const yesterday = new Date();
+  yesterday.setDate(yesterday.getDate() - 1);
+  yesterday.setHours(0, 0, 0, 0);
+
+  console.log(`Processing attendance for: ${yesterday.toDateString()}`);
+
+  // Step 1: Check if it was a holiday
+  const holiday = await prisma.calendar.findFirst({
+    where: {
+      eventType: 'HOLIDAY',
+      startDate: {
+        equals: yesterday,
+      },
+    },
+  });
+
+  if (holiday) {
+    console.log('Date was a holiday. Skipping absence check.');
+    return;
+  }
+
+  // Step 2: Get all employees who should have worked
+  const employees = await prisma.user.findMany({
+    where: { role: 'Employee' /* You could add other filters, e.g., for active employment status */ },
+    select: { id: true },
+  });
+
+  // Step 3: Process each employee
+  for (const employee of employees) {
+    // Check if an attendance record already exists (meaning they checked in)
+    const existingAttendance = await prisma.attendance.findUnique({
+      where: { userId_date: { userId: employee.id, date: yesterday } },
+    });
+
+    if (existingAttendance) {
+      continue; // Skip this employee, they were present.
+    }
+
+    // If no record, check for approved leave
+    const approvedLeave = await prisma.leaveRequest.findFirst({
+      where: {
+        userId: employee.id,
+        status: 'APPROVED',
+        startDate: { lte: yesterday },
+        endDate: { gte: yesterday },
+      },
+    });
+
+    // Step 4: Create the definitive record for the day
+    if (approvedLeave) {
+      await prisma.attendance.create({
+        data: {
+          userId: employee.id,
+          date: yesterday,
+          status: AttendanceStatus.ON_LEAVE,
+          notes: `Auto-generated: User on approved leave (ID: ${approvedLeave.id}).`,
+        },
+      });
+    } else {
+      await prisma.attendance.create({
+        data: {
+          userId: employee.id,
+          date: yesterday,
+          status: AttendanceStatus.ABSENT,
+          notes: 'Auto-generated: No check-in recorded for the day.',
+        },
+      });
+    }
+  }
+  console.log('Daily absence processing complete.');
+}
+
+// To run this:
+// processDailyAbsences();
+By separating the logic this way, you create a very reliable system. The Attendance table becomes the single source of truth for any given day, and its status is guaranteed to be correctly set to PRESENT, ON_LEAVE, or ABSENT by the end of the day.
